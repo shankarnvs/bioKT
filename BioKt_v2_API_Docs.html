@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BioKt v2.0 — API Documentation</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;
+  --blue:#58a6ff;--teal:#3fb950;--purple:#bc8cff;--orange:#ffa657;
+  --red:#f78166;--gray:#8b949e;--text:#e6edf3;--text2:#c9d1d9;
+  --code-bg:#1a2233;--accent:#1f6feb;
+}
+html{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  font-size:13px;background:var(--bg);color:var(--text);height:100%;
+}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline;color:#79c0ff}
+code,pre{font-family:'JetBrains Mono','Fira Code','Cascadia Code',monospace;font-size:12px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ── Layout ── */
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{
+  width:220px;min-width:220px;background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.sidebar-header{
+  background:linear-gradient(135deg,#1f6feb 0%,#0d419d 100%);
+  padding:16px 14px 12px;flex-shrink:0;
+}
+.sidebar-header h1{font-size:16px;font-weight:800;color:#fff}
+.sidebar-header p{font-size:10px;color:#adc8ff;margin-top:2px}
+.sidebar-search{
+  padding:10px 10px 6px;flex-shrink:0;border-bottom:1px solid var(--border);
+}
+.sidebar-search input{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none;
+}
+.sidebar-search input:focus{border-color:var(--blue)}
+.sidebar-nav{flex:1;overflow-y:auto;padding:6px 0 20px}
+.nav-overview{
+  padding:7px 14px;font-size:12px;font-weight:600;color:var(--gray);
+  cursor:pointer;border-radius:5px;margin:2px 6px;
+}
+.nav-overview:hover,.nav-overview.active{background:var(--surface2);color:var(--text)}
+.nav-pkg{
+  padding:7px 14px;font-size:11px;font-weight:700;color:var(--gray);
+  text-transform:uppercase;letter-spacing:.5px;cursor:pointer;
+  display:flex;align-items:center;gap:6px;
+}
+.nav-pkg:hover{color:var(--text)}
+.arrow{font-size:9px;transition:transform .15s;display:inline-block}
+.arrow.open{transform:rotate(90deg)}
+.nav-cls-list{padding:0 0 4px 0}
+.nav-cls{
+  padding:4px 14px 4px 26px;font-size:12px;cursor:pointer;
+  color:var(--text2);display:flex;align-items:center;gap:7px;
+  border-radius:4px;margin:1px 6px;
+}
+.nav-cls:hover,.nav-cls.active{background:var(--accent);color:#fff}
+.nav-cls .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+/* ── Main content ── */
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.topbar{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:8px 24px;display:flex;align-items:center;gap:14px;
+  position:sticky;top:0;z-index:5;flex-shrink:0;
+}
+.topbar .breadcrumb{font-size:12px;color:var(--gray)}
+.topbar .breadcrumb .cur{color:var(--text);font-weight:600}
+.topbar .search-hint{margin-left:auto;font-size:11px;color:var(--gray)}
+
+/* ── Overview hero ── */
+.overview-hero{
+  background:linear-gradient(135deg,#1f6feb 0%,#0d419d 100%);
+  padding:32px 36px;margin:24px 28px 0;border-radius:14px;
+}
+.overview-hero h2{font-size:28px;font-weight:800;color:#fff;margin-bottom:8px}
+.overview-hero p{font-size:13px;color:#adc8ff;line-height:1.7;max-width:680px}
+.stats-row{
+  display:flex;gap:14px;margin:20px 28px;flex-wrap:wrap;
+}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:14px 20px;text-align:center;min-width:100px;
+}
+.stat-card .num{font-size:28px;font-weight:800}
+.stat-card .lbl{font-size:11px;color:var(--gray);margin-top:2px}
+
+/* ── Package overview cards ── */
+.pkg-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
+  gap:14px;padding:20px 28px;
+}
+.pkg-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:18px 20px;cursor:pointer;transition:border-color .15s,background .15s;
+}
+.pkg-card:hover{border-color:var(--accent);background:var(--surface2)}
+.pkg-card h3{font-size:15px;font-weight:700;color:var(--blue);margin-bottom:4px}
+.pkg-card .pkg-file{font-size:10px;color:var(--gray);font-family:monospace;margin-bottom:8px}
+.pkg-card .pkg-desc-short{font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px}
+.chip-row{display:flex;flex-wrap:wrap;gap:5px}
+.chip{
+  display:inline-flex;align-items:center;gap:4px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:12px;padding:2px 8px;font-size:10px;cursor:pointer;
+}
+.chip:hover{background:var(--accent)20;border-color:var(--accent)}
+.chip .dot{width:5px;height:5px;border-radius:50%}
+
+/* ── Class detail ── */
+.cls-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;margin:16px 24px;overflow:hidden;
+}
+.cls-header{
+  padding:20px 22px 16px;border-bottom:1px solid var(--border);
+}
+.kind-badge{
+  display:inline-block;font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:10px;margin-bottom:8px;
+  text-transform:uppercase;letter-spacing:.5px;
+}
+.cls-name{font-size:22px;font-weight:800;color:var(--text);margin-bottom:8px}
+.cls-desc{font-size:13px;color:var(--text2);line-height:1.7}
+.cls-body{padding:16px 22px}
+
+/* ── Sub sections ── */
+.sub-section{margin-bottom:24px}
+.sub-heading{
+  font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;
+  letter-spacing:.6px;margin-bottom:10px;display:flex;align-items:center;gap:8px;
+}
+.cnt{
+  background:var(--accent);color:#fff;font-size:10px;
+  padding:1px 7px;border-radius:8px;font-weight:600;
+}
+
+/* ── Member tables ── */
+.mtable{width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.mtable thead tr{background:var(--surface2)}
+.mtable thead th{
+  padding:8px 13px;text-align:left;font-size:11px;font-weight:700;
+  color:var(--gray);text-transform:uppercase;letter-spacing:.4px;
+  border-bottom:1px solid var(--border);
+}
+.mtable tbody tr:nth-child(odd){background:#1c2128}
+.mtable tbody tr:nth-child(even){background:var(--surface)}
+.mtable tbody tr:hover{background:var(--surface2)}
+.mtable td{padding:8px 13px;vertical-align:top;font-size:12px;border-bottom:1px solid var(--border)22}
+.mtable td.name{
+  font-family:'JetBrains Mono',monospace;color:#ffa657;white-space:nowrap;
+  border-right:1px solid var(--border)33;min-width:160px;
+}
+.mtable td.ret{
+  font-family:'JetBrains Mono',monospace;color:#bc8cff;white-space:nowrap;
+  border-right:1px solid var(--border)33;min-width:110px;
+}
+.mtable td.desc{color:var(--text2)}
+.mtable td.prop-name{
+  font-family:'JetBrains Mono',monospace;color:#3fb950;white-space:nowrap;
+  border-right:1px solid var(--border)33;
+}
+.mtable td.prop-desc{color:var(--text2)}
+
+/* ── Method detail ── */
+.method-detail{
+  background:#0d1117;border:1px solid var(--border);
+  border-radius:7px;padding:14px 16px;margin-bottom:10px;
+}
+.method-sig{
+  font-family:'JetBrains Mono',monospace;font-size:13px;color:#ffa657;
+  background:#1a2233;border-radius:5px;padding:7px 12px;margin-bottom:8px;
+  border-left:3px solid #ffa657;
+}
+.ret-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.ret-label{font-size:11px;color:var(--gray);font-weight:700}
+.ret-val{font-family:'JetBrains Mono',monospace;font-size:12px;color:#bc8cff}
+.method-desc{font-size:12px;color:var(--text2);line-height:1.6}
+
+/* ── Example ── */
+.example-box{
+  background:#1a2233;border:1px solid var(--border);border-radius:8px;
+  padding:14px 16px;margin-top:14px;
+}
+.ex-label{
+  font-size:10px;font-weight:700;color:#3fb950;text-transform:uppercase;
+  letter-spacing:.7px;margin-bottom:10px;
+}
+.example-box pre{
+  font-size:12px;color:var(--text);line-height:1.7;white-space:pre-wrap;word-break:break-word;
+}
+.kw{color:#ff7b72}
+.st{color:#a5d6ff}
+.cm{color:#8b949e;font-style:italic}
+.fn{color:#ffa657}
+.num{color:#79c0ff}
+.tp{color:#ffa657}
+
+/* ── Package section heading ── */
+.pkg-section{padding-bottom:10px}
+.pkg-heading{
+  font-size:18px;font-weight:800;color:var(--blue);
+  padding:24px 24px 6px;display:flex;align-items:baseline;gap:12px;
+}
+.pkg-file{
+  font-size:11px;color:var(--gray);font-family:monospace;font-weight:400;
+}
+.pkg-desc{
+  font-size:13px;color:var(--text2);padding:0 24px 16px;line-height:1.6;
+}
+
+/* ── Hidden/shown ── */
+.hidden{display:none!important}
+.page{display:none}
+.page.active{display:block}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── Sidebar ────────────────────────────── -->
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h1>BioKt v2.0</h1>
+    <p>API Documentation</p>
+  </div>
+  <div class="sidebar-search">
+    <input type="text" id="search" placeholder="&#128269; Search classes…" oninput="filterNav(this.value)">
+  </div>
+  <div class="sidebar-nav" id="sidebar-nav">
+    <div class="nav-overview active" id="nav-overview" onclick="showOverview()">&#9732; Overview</div>
+    <div class="nav-pkg" onclick="togglePkg('biokt.sequences')"><span class="arrow" id="arr_biokt.sequences">▶</span> Sequences</div><div class="nav-cls-list" id="nav_biokt.sequences" style="display:none"><div class="nav-cls" onclick="showClass('biokt.sequences_BioSequence')">
+          <span class="dot" style="background:#d2a8ff"></span>BioSequence
+        </div><div class="nav-cls" onclick="showClass('biokt.sequences_DNASequence')">
+          <span class="dot" style="background:#56d364"></span>DNASequence
+        </div><div class="nav-cls" onclick="showClass('biokt.sequences_RNASequence')">
+          <span class="dot" style="background:#56d364"></span>RNASequence
+        </div><div class="nav-cls" onclick="showClass('biokt.sequences_ProteinSequence')">
+          <span class="dot" style="background:#56d364"></span>ProteinSequence
+        </div><div class="nav-cls" onclick="showClass('biokt.sequences_Orf')">
+          <span class="dot" style="background:#ffa657"></span>Orf
+        </div></div><div class="nav-pkg" onclick="togglePkg('biokt.codons')"><span class="arrow" id="arr_biokt.codons">▶</span> Codon Tables</div><div class="nav-cls-list" id="nav_biokt.codons" style="display:none"><div class="nav-cls" onclick="showClass('biokt.codons_CodonTable')">
+          <span class="dot" style="background:#56d364"></span>CodonTable
+        </div><div class="nav-cls" onclick="showClass('biokt.codons_CodonTables')">
+          <span class="dot" style="background:#79c0ff"></span>CodonTables
+        </div></div><div class="nav-pkg" onclick="togglePkg('biokt.alignment')"><span class="arrow" id="arr_biokt.alignment">▶</span> Alignment</div><div class="nav-cls-list" id="nav_biokt.alignment" style="display:none"><div class="nav-cls" onclick="showClass('biokt.alignment_PairwiseAligner')">
+          <span class="dot" style="background:#56d364"></span>PairwiseAligner
+        </div><div class="nav-cls" onclick="showClass('biokt.alignment_PairwiseAlignment')">
+          <span class="dot" style="background:#ffa657"></span>PairwiseAlignment
+        </div><div class="nav-cls" onclick="showClass('biokt.alignment_MultipleSequenceAligner')">
+          <span class="dot" style="background:#56d364"></span>MultipleSequenceAligner
+        </div><div class="nav-cls" onclick="showClass('biokt.alignment_ScoringMatrices')">
+          <span class="dot" style="background:#79c0ff"></span>ScoringMatrices
+        </div></div><div class="nav-pkg" onclick="togglePkg('biokt.seqio')"><span class="arrow" id="arr_biokt.seqio">▶</span> Sequence I/O</div><div class="nav-cls-list" id="nav_biokt.seqio" style="display:none"><div class="nav-cls" onclick="showClass('biokt.seqio_SeqIO')">
+          <span class="dot" style="background:#79c0ff"></span>SeqIO
+        </div><div class="nav-cls" onclick="showClass('biokt.seqio_SeqRecord')">
+          <span class="dot" style="background:#ffa657"></span>SeqRecord
+        </div></div><div class="nav-pkg" onclick="togglePkg('biokt.blast')"><span class="arrow" id="arr_biokt.blast">▶</span> BLAST</div><div class="nav-cls-list" id="nav_biokt.blast" style="display:none"><div class="nav-cls" onclick="showClass('biokt.blast_SequenceDatabase')">
+          <span class="dot" style="background:#56d364"></span>SequenceDatabase
+        </div></div><div class="nav-pkg" onclick="togglePkg('biokt.phylo')"><span class="arrow" id="arr_biokt.phylo">▶</span> Phylogenetics</div><div class="nav-cls-list" id="nav_biokt.phylo" style="display:none"><div class="nav-cls" onclick="showClass('biokt.phylo_TreeBuilder')">
+          <span class="dot" style="background:#79c0ff"></span>TreeBuilder
+        </div><div class="nav-cls" onclick="showClass('biokt.phylo_PhyloTree')">
+          <span class="dot" style="background:#56d364"></span>PhyloTree
+        </div><div class="nav-cls" onclick="showClass('biokt.phylo_DistanceMatrix')">
+          <span class="dot" style="background:#56d364"></span>DistanceMatrix
+        </div></div><div class="nav-pkg" onclick="togglePkg('biokt.analysis')"><span class="arrow" id="arr_biokt.analysis">▶</span> Analysis</div><div class="nav-cls-list" id="nav_biokt.analysis" style="display:none"><div class="nav-cls" onclick="showClass('biokt.analysis_RestrictionEnzymes')">
+          <span class="dot" style="background:#79c0ff"></span>RestrictionEnzymes
+        </div><div class="nav-cls" onclick="showClass('biokt.analysis_SeqStats')">
+          <span class="dot" style="background:#79c0ff"></span>SeqStats
+        </div><div class="nav-cls" onclick="showClass('biokt.analysis_PopGen')">
+          <span class="dot" style="background:#79c0ff"></span>PopGen
+        </div><div class="nav-cls" onclick="showClass('biokt.analysis_IUPAC')">
+          <span class="dot" style="background:#79c0ff"></span>IUPAC
+        </div></div><div class="nav-pkg" onclick="togglePkg('biokt.molecule')"><span class="arrow" id="arr_biokt.molecule">▶</span> Molecule</div><div class="nav-cls-list" id="nav_biokt.molecule" style="display:none"><div class="nav-cls" onclick="showClass('biokt.molecule_Molecule')">
+          <span class="dot" style="background:#56d364"></span>Molecule
+        </div><div class="nav-cls" onclick="showClass('biokt.molecule_Atom')">
+          <span class="dot" style="background:#ffa657"></span>Atom
+        </div><div class="nav-cls" onclick="showClass('biokt.molecule_Bond')">
+          <span class="dot" style="background:#ffa657"></span>Bond
+        </div><div class="nav-cls" onclick="showClass('biokt.molecule_BondType')">
+          <span class="dot" style="background:#f78166"></span>BondType
+        </div></div><div class="nav-pkg" onclick="togglePkg('biokt.descriptors')"><span class="arrow" id="arr_biokt.descriptors">▶</span> Mol Descriptors</div><div class="nav-cls-list" id="nav_biokt.descriptors" style="display:none"><div class="nav-cls" onclick="showClass('biokt.descriptors_MolDescriptors')">
+          <span class="dot" style="background:#79c0ff"></span>MolDescriptors
+        </div><div class="nav-cls" onclick="showClass('biokt.descriptors_Fingerprints')">
+          <span class="dot" style="background:#79c0ff"></span>Fingerprints
+        </div><div class="nav-cls" onclick="showClass('biokt.descriptors_VirtualScreening')">
+          <span class="dot" style="background:#79c0ff"></span>VirtualScreening
+        </div></div><div class="nav-pkg" onclick="togglePkg('biokt.protdesc')"><span class="arrow" id="arr_biokt.protdesc">▶</span> Protein Descriptors</div><div class="nav-cls-list" id="nav_biokt.protdesc" style="display:none"><div class="nav-cls" onclick="showClass('biokt.protdesc_ProteinDescriptors')">
+          <span class="dot" style="background:#79c0ff"></span>ProteinDescriptors
+        </div></div><div class="nav-pkg" onclick="togglePkg('biokt.seqinteraction')"><span class="arrow" id="arr_biokt.seqinteraction">▶</span> Seq Interactions</div><div class="nav-cls-list" id="nav_biokt.seqinteraction" style="display:none"><div class="nav-cls" onclick="showClass('biokt.seqinteraction_ProteinInteraction')">
+          <span class="dot" style="background:#79c0ff"></span>ProteinInteraction
+        </div><div class="nav-cls" onclick="showClass('biokt.seqinteraction_DNAInteraction')">
+          <span class="dot" style="background:#79c0ff"></span>DNAInteraction
+        </div><div class="nav-cls" onclick="showClass('biokt.seqinteraction_RNAInteraction')">
+          <span class="dot" style="background:#79c0ff"></span>RNAInteraction
+        </div><div class="nav-cls" onclick="showClass('biokt.seqinteraction_DNARNAInteraction')">
+          <span class="dot" style="background:#79c0ff"></span>DNARNAInteraction
+        </div></div><div class="nav-pkg" onclick="togglePkg('biokt.molinteraction')"><span class="arrow" id="arr_biokt.molinteraction">▶</span> Mol Interactions</div><div class="nav-cls-list" id="nav_biokt.molinteraction" style="display:none"><div class="nav-cls" onclick="showClass('biokt.molinteraction_DrugProteinBinding')">
+          <span class="dot" style="background:#79c0ff"></span>DrugProteinBinding
+        </div><div class="nav-cls" onclick="showClass('biokt.molinteraction_DrugDNABinding')">
+          <span class="dot" style="background:#79c0ff"></span>DrugDNABinding
+        </div><div class="nav-cls" onclick="showClass('biokt.molinteraction_DrugRNABinding')">
+          <span class="dot" style="background:#79c0ff"></span>DrugRNABinding
+        </div><div class="nav-cls" onclick="showClass('biokt.molinteraction_MetalLigandBinding')">
+          <span class="dot" style="background:#79c0ff"></span>MetalLigandBinding
+        </div></div>
+  </div>
+</div>
+
+<!-- ── Main area ────────────────────────────── -->
+<div class="main" id="main">
+  <div class="topbar">
+    <div class="breadcrumb" id="breadcrumb"><span class="cur">Overview</span></div>
+    <div class="search-hint">Use sidebar search or Ctrl+F to find members</div>
+  </div>
+  <div id="content-area">
+
+  <!-- Overview page -->
+  <div class="page active" id="page-overview">
+    <div class="overview-hero">
+      <h2>BioKt v2.0 API Reference</h2>
+      <p>A comprehensive Kotlin/JVM bioinformatics library covering sequence analysis, molecular modelling, drug-likeness screening, ADMET profiling, protein descriptors, and molecule–sequence interactions.</p>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="num" style="color:#58a6ff">12</div><div class="lbl">Modules</div></div>
+      <div class="stat-card"><div class="num" style="color:#3fb950">37</div><div class="lbl">Classes & Objects</div></div>
+      <div class="stat-card"><div class="num" style="color:#bc8cff">140+</div><div class="lbl">API Methods</div></div>
+      <div class="stat-card"><div class="num" style="color:#ffa657">39/39</div><div class="lbl">Tests Passing</div></div>
+    </div>
+    <div class="pkg-grid" id="overview-grid"></div>
+  </div>
+
+  <!-- Class pages injected dynamically -->
+  <div id="detail-container"></div>
+
+  </div><!-- content-area -->
+</div><!-- main -->
+</div><!-- app -->
+
+<script>
+// ── API DATA ──────────────────────────────────────────────────
+const API = {"biokt.sequences": {"label": "Sequences", "file": "Sequence.kt", "desc": "Core biological sequence types: DNA, RNA, Protein. All inherit from BioSequence.", "classes": [{"name": "BioSequence", "kind": "sealed class", "desc": "Abstract base for all biological sequences. Provides motif search, GC content, and GC skew.", "props": [["sequence: String", "Raw sequence string (always uppercase)"], ["id: String", "Sequence identifier"], ["description: String", "Free-text description"], ["length: Int", "Sequence length"]], "methods": [["get(index)", "Char", "Character at position"], ["get(range)", "String", "Subsequence slice"], ["count(base)", "Int", "Count occurrences of a base/amino acid"], ["countAll()", "Map<Char,Int>", "Count all characters"], ["findMotif(pattern)", "List<Int>", "All start positions of pattern (case-insensitive)"], ["gcContent()", "Double", "GC percentage (0\u2013100)"], ["gcSkew(windowSize, stepSize)", "List<Pair<Int,Double>>", "GC skew = (G\u2212C)/(G+C) in sliding windows"], ["complement()", "BioSequence", "Complementary sequence"], ["reverseComplement()", "BioSequence", "Reverse complement"]], "example": "val seq = DNASequence(\"ATCGATCG\", id=\"ex1\")\nprintln(seq.gcContent())       // 50.0\nprintln(seq.findMotif(\"ATC\"))  // [0, 4]"}, {"name": "DNASequence", "kind": "class", "desc": "Double-stranded DNA sequence. Supports IUPAC ambiguity codes. Inherits all BioSequence methods.", "props": [], "methods": [["complement()", "DNASequence", "Watson-Crick complement (A\u2194T, G\u2194C) with IUPAC support"], ["reverseComplement()", "DNASequence", "Reverse complement of the sequence"], ["transcribe()", "RNASequence", "T\u2192U transcription"], ["translate(table, startCodon)", "ProteinSequence", "Translate using codon table; optionally start at first ATG"], ["sixFrameTranslation(table)", "Map<String,ProteinSequence>", "All 6 reading frames (+1/+2/+3/\u22121/\u22122/\u22123)"], ["findOrfs(minLength, table)", "List<Orf>", "Detect all ORFs \u2265 minLength bp in all 3 forward frames"], ["meltingTemperature()", "Double", "Tm \u00b0C (2-4 rule for short; adjusted formula for \u226514 bp)"], ["subSequence(start, end)", "DNASequence", "Slice a sub-sequence"]], "example": "val dna = DNASequence(\"ATGGCCATTGTAATGGGCCGCTGA\")\nprintln(dna.reverseComplement())  // TCAGCGGCCCATTACAATGGCCAT\nprintln(dna.translate())          // MAIVMGR\nprintln(dna.meltingTemperature()) // 70.8\nval orfs = dna.findOrfs(minLength = 6)"}, {"name": "RNASequence", "kind": "class", "desc": "Single-stranded RNA sequence (A/U/G/C). Inherits all BioSequence methods.", "props": [], "methods": [["complement()", "RNASequence", "Watson-Crick complement (A\u2194U, G\u2194C)"], ["reverseComplement()", "RNASequence", "Reverse complement"], ["backTranscribe()", "DNASequence", "U\u2192T back-transcription to DNA"], ["translate(table)", "ProteinSequence", "Translate via back-transcription"]], "example": "val rna = RNASequence(\"AUGCCUAAG\")\nprintln(rna.backTranscribe())  // ATGCCTAAG\nprintln(rna.translate())       // MP*"}, {"name": "ProteinSequence", "kind": "class", "desc": "Protein sequence (20 standard amino acids + stop *). Provides physicochemical calculations.", "props": [], "methods": [["molecularWeight()", "Double", "Average MW in Da (sum of residue weights \u2212 water losses)"], ["isoelectricPoint()", "Double", "pI via binary search on Henderson-Hasselbalch"], ["aminoAcidComposition()", "Map<Char,Double>", "Percent composition of each amino acid"], ["aromaticity()", "Double", "Fraction of aromatic residues (F/H/W/Y)"], ["instabilityIndex()", "Double", "Guruprasad DIWV instability index"], ["subSequence(start, end)", "ProteinSequence", "Slice a sub-sequence"]], "example": "val prot = ProteinSequence(\"MKALVLLYLLFSSAYS\")\nprintln(prot.molecularWeight())    // ~1735.1\nprintln(prot.isoelectricPoint())   // ~10.5\nprintln(prot.aromaticity())        // 0.0625"}, {"name": "Orf", "kind": "data class", "desc": "Open Reading Frame detected by DNASequence.findOrfs().", "props": [["start: Int", "Start position in parent sequence (0-based)"], ["end: Int", "End position (exclusive)"], ["frame: Int", "Reading frame (1, 2, or 3)"], ["strand: Char", "'+' for forward strand"], ["sequence: DNASequence", "ORF nucleotide sequence including stop codon"], ["protein: ProteinSequence", "Translated protein (stop codon excluded)"], ["length: Int", "ORF length in bp"]], "methods": [], "example": "val orfs = DNASequence(\"ATGCCCAAATAG\").findOrfs(minLength=3)\norfs.forEach { println(it) }\n// ORF[frame=+1, pos=0..12, len=12, protein=MPK...]"}]}, "biokt.codons": {"label": "Codon Tables", "file": "CodonTable.kt", "desc": "Codon translation tables. Standard, Vertebrate Mitochondrial, Yeast Mitochondrial and custom.", "classes": [{"name": "CodonTable", "kind": "class", "desc": "Maps 64 codons to amino acids/stop. Use CodonTables.STANDARD for the default.", "props": [["name: String", "Table name"], ["id: Int", "NCBI genetic code ID"]], "methods": [["translate(codon)", "Char", "Translate a 3-letter codon to single-letter AA or '*' for stop"], ["startCodons()", "Set<String>", "Valid start codons for this table"]], "example": "val table = CodonTables.STANDARD\nprintln(table.translate(\"ATG\"))  // M\nprintln(table.translate(\"TAA\"))  // *\nval mito = CodonTables.VERT_MITO\nprintln(mito.translate(\"TGA\"))   // W  (differs from standard)"}, {"name": "CodonTables", "kind": "object", "desc": "Factory for standard codon tables.", "props": [["STANDARD", "Standard genetic code (NCBI table 1)"], ["VERT_MITO", "Vertebrate mitochondrial code (table 2)"], ["YEAST_MITO", "Yeast mitochondrial code (table 3)"]], "methods": [], "example": ""}]}, "biokt.alignment": {"label": "Alignment", "file": "Alignment.kt", "desc": "Pairwise and multiple sequence alignment. Needleman-Wunsch, Smith-Waterman, BLOSUM62, PAM250.", "classes": [{"name": "PairwiseAligner", "kind": "class", "desc": "Dynamic-programming aligner supporting global (NW), local (SW), and semi-global modes. Accepts custom substitution matrices.", "props": [["mode: Mode", "GLOBAL | LOCAL | SEMIGLOBAL"], ["matchScore: Double", "Score for matching bases (default 2.0)"], ["mismatchScore: Double", "Penalty for mismatches (default \u22121.0)"], ["gapOpen: Double", "Gap open penalty (default \u22122.0)"], ["gapExtend: Double", "Gap extension penalty (default \u22120.5)"], ["substitutionMatrix", "Optional BLOSUM62/PAM250 map"]], "methods": [["align(seqA, seqB)", "PairwiseAlignment", "Align two sequences; returns alignment with score and identity"]], "example": "val aligner = PairwiseAligner(mode = PairwiseAligner.Mode.GLOBAL)\nval aln = aligner.align(\"ATCGATCG\", \"ATCG\")\nprintln(aln.score)     // 8.0\nprintln(aln.identity)  // 1.0\nprintln(aln.prettyPrint())\n\n// Protein alignment with BLOSUM62\nval protAligner = PairwiseAligner(\n    mode = PairwiseAligner.Mode.LOCAL,\n    substitutionMatrix = ScoringMatrices.BLOSUM62\n)\nval pAln = protAligner.align(\"MAEGEITTFT\", \"MAEGEITTFA\")"}, {"name": "PairwiseAlignment", "kind": "data class", "desc": "Result of a pairwise alignment.", "props": [["seqA / seqB: String", "Original sequences"], ["alignedA / alignedB: String", "Aligned sequences with gap characters (-)"], ["score: Double", "Alignment score"], ["identity: Double", "Fraction of identical positions"], ["similarity: Double", "Fraction of similar positions (substitution matrix)"], ["gaps: Int", "Total gap characters"]], "methods": [["prettyPrint(lineWidth)", "String", "Multi-line human-readable alignment display"]], "example": ""}, {"name": "MultipleSequenceAligner", "kind": "class", "desc": "Progressive MSA using pairwise guide tree.", "props": [], "methods": [["align(sequences)", "MultipleAlignment", "Align a list of BioSequences"]], "example": "val msa = MultipleSequenceAligner()\nval result = msa.align(listOf(\n    DNASequence(\"ATCGATCG\"),\n    DNASequence(\"ATCGTTCG\"),\n    DNASequence(\"AACGATCG\")\n))\nprintln(result.percentIdentity())\nprintln(result.consensusSequence())"}, {"name": "ScoringMatrices", "kind": "object", "desc": "Built-in substitution matrices for protein alignment.", "props": [["BLOSUM62", "BLOSUM62 substitution matrix"], ["PAM250", "PAM250 substitution matrix"]], "methods": [["dnaScoringMatrix(match, mismatch)", "Map<Pair<Char,Char>,Int>", "Simple match/mismatch matrix for DNA"]], "example": ""}]}, "biokt.seqio": {"label": "Sequence I/O", "file": "SeqIO.kt", "desc": "Parse and write biological sequence file formats: FASTA, FASTQ, GenBank, Stockholm.", "classes": [{"name": "SeqIO", "kind": "object", "desc": "Central I/O handler. Dispatches to format-specific parsers.", "props": [], "methods": [["parse(filename, format)", "List<SeqRecord>", "Read sequences from file. format: fasta | fastq | genbank | stockholm"], ["parseString(text, format)", "List<SeqRecord>", "Parse sequences from a String (e.g. from Android ContentResolver)"], ["write(records, filename, format)", "Unit", "Write SeqRecord list to file"], ["writeString(records, format)", "String", "Serialize to String"], ["convert(inputFile, inputFmt, outputFile, outputFmt)", "Unit", "Format conversion"]], "example": "// Read FASTA\nval records = SeqIO.parse(\"sequences.fasta\", \"fasta\")\nrecords.forEach { println(\">${it.id}: ${it.seq.length} bp\") }\n\n// Parse from string (Android)\nval text = contentResolver.openInputStream(uri)?.bufferedReader()?.readText()\nval recs = SeqIO.parseString(text ?: \"\", \"fasta\")\n\n// Write FASTQ\nSeqIO.write(records, \"output.fastq\", \"fastq\")"}, {"name": "SeqRecord", "kind": "data class", "desc": "A sequence with metadata (id, description, annotations, features, quality scores).", "props": [["id: String", "Primary accession / identifier"], ["description: String", "Free-text description"], ["seq: BioSequence", "The actual sequence object"], ["features: List<SeqFeature>", "Annotated features (CDS, gene, exon\u2026)"], ["annotations: Map<String,Any>", "Key-value metadata"], ["quality: List<Int>?", "Phred quality scores (FASTQ only)"]], "methods": [], "example": ""}]}, "biokt.blast": {"label": "BLAST", "file": "Blast.kt", "desc": "k-mer indexed sequence similarity search (BLASTn for DNA, BLASTp for protein).", "classes": [{"name": "SequenceDatabase", "kind": "class", "desc": "In-memory sequence database with k-mer index for fast BLAST-style searches.", "props": [["name: String", "Database name"], ["size: Int", "Number of sequences"]], "methods": [["add(record)", "Unit", "Add a SeqRecord to the database"], ["addAll(records)", "Unit", "Add multiple records"], ["buildIndex(k)", "Unit", "Build k-mer index (default k=11)"], ["blastn(query, wordSize, eValueCutoff, maxHits)", "BlastResult", "DNA similarity search"], ["blastp(query, wordSize, eValueCutoff, maxHits)", "BlastResult", "Protein similarity search"], ["loadFasta(filename)", "Unit", "Load sequences from FASTA file"]], "example": "val db = SequenceDatabase(\"mydb\")\ndb.loadFasta(\"reference.fasta\")\ndb.buildIndex(k = 11)\n\nval query = DNASequence(\"ATCGATCGATCG\", id=\"q1\")\nval result = db.blastn(query, eValueCutoff = 1e-5)\nresult.bestHits(5).forEach { hit ->\n    println(\"${hit.id}: E=${hit.bestHsp?.eValue}\")\n}"}]}, "biokt.phylo": {"label": "Phylogenetics", "file": "Phylogenetics.kt", "desc": "Distance-based phylogenetic tree construction and Newick format I/O.", "classes": [{"name": "TreeBuilder", "kind": "object", "desc": "Builds phylogenetic trees from distance matrices.", "props": [], "methods": [["upgma(matrix)", "PhyloTree", "UPGMA (Unweighted Pair Group Method with Arithmetic Mean)"], ["neighborJoining(matrix)", "PhyloTree", "Neighbour-Joining algorithm (Saitou & Nei 1987)"]], "example": "val m = DistanceMatrix(\n    labels = listOf(\"Human\", \"Chimp\", \"Mouse\"),\n    data = arrayOf(\n        doubleArrayOf(0.0, 0.02, 0.25),\n        doubleArrayOf(0.02, 0.0, 0.26),\n        doubleArrayOf(0.25, 0.26, 0.0)\n    )\n)\nval tree = TreeBuilder.neighborJoining(m)\nprintln(tree.toNewick())          // ((Human:0.01,Chimp:0.01):0.12,Mouse:0.13);\nprintln(tree.leaves().size)       // 3"}, {"name": "PhyloTree", "kind": "class", "desc": "Rooted phylogenetic tree. Supports Newick serialization and traversal.", "props": [], "methods": [["toNewick()", "String", "Serialize tree to Newick format"], ["leaves()", "List<PhyloNode.Leaf>", "All leaf nodes"], ["fromNewick(newick)", "PhyloTree", "Parse a Newick string (companion)"]], "example": ""}, {"name": "DistanceMatrix", "kind": "class", "desc": "Symmetric distance matrix for phylogenetic input.", "props": [["labels: List<String>", "Taxon labels"], ["data: Array<DoubleArray>", "n\u00d7n distance matrix"]], "methods": [], "example": ""}]}, "biokt.analysis": {"label": "Analysis", "file": "Analysis.kt", "desc": "Restriction enzymes, sequence statistics, population genetics (Tajima's D, Fst, dN/dS), IUPAC codes.", "classes": [{"name": "RestrictionEnzymes", "kind": "object", "desc": "25+ common restriction enzymes. Virtual digest and site detection.", "props": [["ENZYMES", "Map<String,Pair<String,Int>>", "Recognition sequence and cut offset for each enzyme"]], "methods": [["digest(dna)", "List<RestrictionSite>", "Find all restriction sites in a DNASequence"], ["virtualDigest(dna, enzymes)", "List<DNASequence>", "Simulate enzyme digest; returns resulting fragments"]], "example": "val dna = DNASequence(\"GAATTCATGCGGATCC\")\nval sites = RestrictionEnzymes.digest(dna)\n// [RestrictionSite(enzyme=EcoRI, pos=0, ...), RestrictionSite(enzyme=BamHI, pos=10, ...)]\n\nval fragments = RestrictionEnzymes.virtualDigest(dna, listOf(\"EcoRI\",\"BamHI\"))\nfragments.forEach { println(it.sequence) }"}, {"name": "SeqStats", "kind": "object", "desc": "Assembly statistics and codon usage analysis.", "props": [], "methods": [["nStats(sequences)", "NStats", "N50, N90, L50, total length, max length"], ["codonUsageTable(dna)", "Map<String,Int>", "Raw codon counts"], ["relativeCodonAdaptation(counts, table)", "Map<String,Double>", "RSCU relative synonymous codon usage"], ["nucleotideFrequency(seq)", "Map<Char,Double>", "Normalized base frequencies"], ["dinucleotideFrequency(seq)", "Map<String,Double>", "All 16 dinucleotide frequencies"], ["entropy(seq)", "Double", "Shannon entropy of the sequence"], ["linguisticComplexity(seq)", "Double", "Ratio of distinct k-mers to theoretical max"]], "example": "val seqs = listOf(DNASequence(\"ATCG\"*100), DNASequence(\"GCTA\"*50))\nval stats = SeqStats.nStats(seqs)\nprintln(stats.n50)   // 400\nprintln(stats.l50)   // 1"}, {"name": "PopGen", "kind": "object", "desc": "Population genetics statistics.", "props": [], "methods": [["tajimasD(sequences)", "Double", "Tajima's D neutrality test statistic"], ["fst(pop1, pop2)", "Double", "Wright's fixation index Fst between two populations"], ["dNdS(seq1, seq2, table)", "Pair<Double,Double>", "Non-synonymous and synonymous substitution rates (dN, dS)"]], "example": "val pop1 = listOf(DNASequence(\"ATCGATCG\"), DNASequence(\"ATCGTTCG\"))\nval pop2 = listOf(DNASequence(\"GCTAGCTA\"), DNASequence(\"GCTAACTA\"))\nprintln(PopGen.fst(pop1, pop2))        // ~0.8\nprintln(PopGen.tajimasD(pop1))         // D statistic"}, {"name": "IUPAC", "kind": "object", "desc": "IUPAC ambiguity code expansion and encoding.", "props": [], "methods": [["expandAmbiguous(sequence)", "List<String>", "Expand all IUPAC codes to concrete bases (e.g. R\u2192A,G)"], ["ambiguityCode(bases)", "Char", "Get IUPAC code for a set of bases (e.g. {A,G}\u2192R)"]], "example": "println(IUPAC.expandAmbiguous(\"ACR\"))\n// [\"ACA\", \"ACG\"]\nprintln(IUPAC.ambiguityCode(setOf('A','G')))  // R\nprintln(IUPAC.ambiguityCode(setOf('A','T','G','C')))  // N"}]}, "biokt.molecule": {"label": "Molecule", "file": "Molecule.kt", "desc": "Small molecule representation from SMILES strings. Atom-bond molecular graph, ring detection, implicit hydrogen assignment.", "classes": [{"name": "Molecule", "kind": "class", "desc": "Molecular graph built by parsing a SMILES string. Provides atom/bond queries, ring detection, and basic property calculation.", "props": [["smiles: String", "Input SMILES string"], ["name: String", "Molecule name (optional)"], ["id: String", "Molecule identifier"], ["atoms: List<Atom>", "All heavy atoms in the graph"], ["bonds: List<Bond>", "All bonds"], ["rings: List<Ring>", "SSSR rings detected by DFS"]], "methods": [["molecularFormula()", "String", "Hill-order formula (e.g. C9H8O4)"], ["exactMass()", "Double", "Monoisotopic mass in Da"], ["numAtoms(includeH)", "Int", "Heavy atom count or total including implicit H"], ["numBonds()", "Int", "Bond count"], ["numRings()", "Int", "Ring count"], ["numAromaticRings()", "Int", "Aromatic ring count"], ["neighborsOf(atomIdx)", "List<Int>", "Indices of atoms bonded to given atom"], ["bondBetween(a, b)", "Bond?", "Bond between two atom indices, or null"]], "example": "val aspirin = Molecule(\"CC(=O)Oc1ccccc1C(=O)O\", name=\"Aspirin\")\nprintln(aspirin.molecularFormula())  // C9H8O4\nprintln(aspirin.exactMass())         // 180.042\nprintln(aspirin.numRings())          // 1\nprintln(aspirin.numAromaticRings())  // 1\n\nval caffeine = Molecule(\"Cn1cnc2c1c(=O)n(c(=O)n2C)C\", name=\"Caffeine\")\nprintln(caffeine.molecularFormula()) // C8H10N4O2\nprintln(caffeine.numRings())         // 2"}, {"name": "Atom", "kind": "data class", "desc": "Single atom in the molecular graph.", "props": [["index: Int", "Position in the atoms list"], ["symbol: String", "Element symbol (C, N, O, \u2026)"], ["atomicNum: Int", "Atomic number"], ["charge: Int", "Formal charge"], ["isAromatic: Boolean", "True for aromatic atoms (lowercase in SMILES)"], ["implicitH: Int", "Implicit hydrogen count (assigned automatically)"], ["totalH: Int", "implicitH + explicitH"], ["atomicMass: Double", "Average atomic mass"], ["electronegativity: Double", "Pauling electronegativity"], ["vdwRadius: Double", "Van der Waals radius (\u00c5)"]], "methods": [], "example": ""}, {"name": "Bond", "kind": "data class", "desc": "Bond between two atoms.", "props": [["atom1 / atom2: Int", "Atom indices"], ["type: BondType", "SINGLE | DOUBLE | TRIPLE | AROMATIC"], ["isRing: Boolean", "True if this bond closes a ring"], ["order: Double", "1.0 / 2.0 / 3.0 / 1.5 for aromatic"]], "methods": [], "example": ""}, {"name": "BondType", "kind": "enum class", "desc": "Chemical bond order.", "props": [["SINGLE(1.0)", "Single bond"], ["DOUBLE(2.0)", "Double bond"], ["TRIPLE(3.0)", "Triple bond"], ["AROMATIC(1.5)", "Aromatic bond"]], "methods": [], "example": ""}]}, "biokt.descriptors": {"label": "Mol Descriptors", "file": "MolDescriptors.kt", "desc": "Molecular descriptors, drug-likeness filters, ADMET profiling, fingerprints, and virtual screening.", "classes": [{"name": "MolDescriptors", "kind": "object", "desc": "Calculates physicochemical and drug-likeness descriptors for Molecule objects.", "props": [], "methods": [["calculate(mol)", "MolecularDescriptors", "Full descriptor calculation \u2014 the main entry point"], ["molecularWeight(mol)", "Double", "Average molecular weight (Da)"], ["wilmanCrippenLogP(mol)", "Double", "Wildman-Crippen atom-contribution logP"], ["hBondDonors(mol)", "Int", "N-H and O-H donors"], ["hBondAcceptors(mol)", "Int", "N and O acceptors (Lipinski definition)"], ["tpsa(mol)", "Double", "Ertl topological polar surface area (\u00c5\u00b2)"], ["rotatableBonds(mol)", "Int", "Non-terminal, non-ring single bonds"], ["fractionCSP3(mol)", "Double", "Fraction of sp3 carbon atoms"], ["molarRefractivity(mol)", "Double", "Wildman-Crippen molar refractivity"], ["stereocenters(mol)", "Int", "Chiral sp3 carbon count (approximate)"], ["lipinskiRo5(mw,logP,hbd,hba)", "Boolean", "Lipinski Rule of Five"], ["veberRules(tpsa,rotBonds)", "Boolean", "Veber oral bioavailability rules"], ["ghoseFilter(mw,logP,mr,atoms)", "Boolean", "Ghose drug-likeness filter"], ["eganFilter(logP,tpsa)", "Boolean", "Egan filter for oral bioavailability"], ["mueggeFilter(mol,\u2026)", "Int", "Muegge filter score (0-9)"], ["estimateADMET(mol,\u2026)", "ADMETProfile", "Rule-based ADMET property estimation"], ["checkStructuralAlerts(mol)", "List<StructuralAlert>", "PAINS/Brenk-style reactive group detection"]], "example": "val aspirin = Molecule(\"CC(=O)Oc1ccccc1C(=O)O\", name=\"Aspirin\")\nval d = MolDescriptors.calculate(aspirin)\n\nprintln(d.molecularWeight)               // 180.16\nprintln(d.logP)                          // 1.24\nprintln(d.lipinskiPasses)               // true\nprintln(d.admet.oralBioavailability)    // \"High\"\nprintln(d.admet.bbbPenetration)         // true\n\nval alerts = MolDescriptors.checkStructuralAlerts(aspirin)\n// [] \u2014 no alerts for aspirin"}, {"name": "Fingerprints", "kind": "object", "desc": "Molecular fingerprint generation and similarity metrics.", "props": [], "methods": [["morgan(mol, radius, nBits)", "BooleanArray", "Circular ECFP-style fingerprint (default radius=2, bits=1024)"], ["maccs(mol)", "BooleanArray", "166-bit MACCS structural keys"], ["topological(mol, nBits, maxPath)", "BooleanArray", "RDKit-style path fingerprint (default 2048 bits)"], ["tanimoto(fp1, fp2)", "Double", "Tanimoto/Jaccard coefficient"], ["dice(fp1, fp2)", "Double", "S\u00f8rensen-Dice coefficient"], ["cosine(fp1, fp2)", "Double", "Cosine similarity"]], "example": "val aspirin   = Molecule(\"CC(=O)Oc1ccccc1C(=O)O\")\nval ibuprofen = Molecule(\"CC(C)Cc1ccc(cc1)C(C)C(=O)O\")\nval caffeine  = Molecule(\"Cn1cnc2c1c(=O)n(c(=O)n2C)C\")\n\nval fp1 = Fingerprints.morgan(aspirin)\nval fp2 = Fingerprints.morgan(ibuprofen)\nval fp3 = Fingerprints.morgan(caffeine)\n\nprintln(Fingerprints.tanimoto(fp1, fp2))  // 0.419 (structurally similar)\nprintln(Fingerprints.tanimoto(fp1, fp3))  // 0.098 (dissimilar)\nprintln(Fingerprints.dice(fp1, fp2))      // 0.590"}, {"name": "VirtualScreening", "kind": "object", "desc": "Fingerprint-based virtual screening and diversity selection.", "props": [], "methods": [["screenLibrary(query, library, fingerprintType, tanimotoThreshold, applyLipinski, topN)", "List<VirtualScreeningResult>", "Screen a compound library against a query molecule"], ["diversityPicking(molecules, n, fingerprintType)", "List<Molecule>", "MaxMin diversity selection of n compounds"]], "example": "val library = listOf(aspirin, ibuprofen, caffeine, paracetamol)\nval hits = VirtualScreening.screenLibrary(\n    query = aspirin,\n    library = library,\n    fingerprintType = \"morgan\",  // \"morgan\" | \"maccs\" | \"topo\"\n    tanimotoThreshold = 0.3,\n    applyLipinski = true,\n    topN = 10\n)\nhits.forEach { println(\"#${it.rank} ${it.molecule.name}: Tc=${it.tanimoto}\") }\n\n// Diversity selection\nval diverse50 = VirtualScreening.diversityPicking(library, n = 50)"}]}, "biokt.protdesc": {"label": "Protein Descriptors", "file": "ProteinDescriptors.kt", "desc": "Machine-learning-ready protein descriptors: composition, CTD, QSO, PAAC, autocorrelation, and physicochemical profiles.", "classes": [{"name": "ProteinDescriptors", "kind": "object", "desc": "Comprehensive protein descriptor calculator mirroring pyBioMed PyPro.", "props": [], "methods": [["aminoAcidComposition(seq)", "Map<String,Double>", "20-D AAC vector \u2014 fraction of each amino acid"], ["dipeptideComposition(seq)", "Map<String,Double>", "400-D DPC vector \u2014 fraction of each dipeptide"], ["tripeptideComposition(seq)", "Map<String,Double>", "8000-D TPC vector (sparse)"], ["ctdDescriptors(seq)", "Map<String,Double>", "CTD: Composition/Transition/Distribution across 5 physicochemical properties"], ["quasiSequenceOrder(seq, maxLag, weight)", "Map<String,Double>", "QSO with Schneider-Wrede physicochemical distance matrix"], ["pseudoAAC(seq, lambdaMax, weight)", "Map<String,Double>", "PAAC \u2014 Chou's pseudo-amino acid composition"], ["gearyAutocorrelation(seq, maxLag)", "Map<String,Double>", "Geary C statistic for MW and pK1"], ["moranAutocorrelation(seq, maxLag)", "Map<String,Double>", "Moran I autocorrelation for hydrophobicity"], ["calculateAll(seq)", "ProteinDescriptorSet", "All descriptor families in one call"], ["gravyIndex(seq)", "Double", "Kyte-Doolittle GRAVY score"], ["aliphaticIndex(seq)", "Double", "Ikai 1980 aliphatic index"], ["bomanIndex(seq)", "Double", "Boman membrane-interaction potential"], ["chargeAtPH(seq, pH)", "Double", "Net charge via Henderson-Hasselbalch"], ["hydrophobicRatio(seq)", "Double", "Fraction of hydrophobic residues (AVILMFWP)"], ["extinctionCoefficient(seq)", "Double", "Molar extinction coefficient \u2014 Pace 1995"], ["physicochemicalProfile(seq)", "Map<String,Double>", "11-property summary: MW, pI, GRAVY, aliphatic index, etc."]], "example": "val prot = ProteinSequence(\"MKALVLLYLLFSSAYSRGVFRRDTHKPPVYK\")\n\n// Single descriptors\nprintln(ProteinDescriptors.gravyIndex(prot))       // \u22120.16\nprintln(ProteinDescriptors.aliphaticIndex(prot))   // 94.9\nprintln(ProteinDescriptors.chargeAtPH(prot, 7.0))  // +2.3\n\n// Composition vectors\nval aac = ProteinDescriptors.aminoAcidComposition(prot)\naac.entries.sortedByDescending { it.value }.take(3)\n    .forEach { println(\"${it.key}=${it.value}\") }\n// L=0.154, K=0.103, P=0.103\n\n// All descriptors for ML\nval allDesc = ProteinDescriptors.calculateAll(prot)\nval flatMap = allDesc.toFlatMap()  // ~500+ features\nprintln(flatMap.size)"}]}, "biokt.seqinteraction": {"label": "Seq Interactions", "file": "SequenceInteraction.kt", "desc": "Sequence-level interaction modelling: protein-protein interaction, DNA hybridisation thermodynamics, RNA folding, miRNA targeting, CRISPR efficiency.", "classes": [{"name": "ProteinInteraction", "kind": "object", "desc": "Protein-protein interaction scoring and structural feature prediction.", "props": [], "methods": [["score(seqA, seqB)", "InteractionScore", "Empirical PPI score based on charge complementarity, hydrophobicity, interface propensity and GRAVY"], ["predictInterfaceResidues(seq)", "List<InterfaceResidue>", "Ofran-Rost propensity scores for interface residue prediction"], ["conjunctionFeatures(seqA, seqB)", "Map<String,Double>", "Pairwise ML feature vector for PPI classifiers"], ["predictCoiledCoil(seq, window)", "List<CoiledCoilSegment>", "Heptad-repeat coiled-coil prediction with merging"], ["predictTransmembraneHelices(seq, window, threshold)", "List<IntRange>", "Kyte-Doolittle sliding-window TM helix prediction"]], "example": "val seqA = ProteinSequence(\"MKALVLLYLLFSSAYSRGVFRRDTHKPP\")\nval seqB = ProteinSequence(\"ACDEFGHIKLMNPQRSTVWYACDEFGHI\")\n\nval ppi = ProteinInteraction.score(seqA, seqB)\nprintln(ppi.confidence)          // 0.88\nprintln(ppi.isLikelyInteracting) // true\nprintln(ppi.evidence)\n// [Charge complementarity, Hydrophobic patch match, High interface propensity]\n\nval iface = ProteinInteraction.predictInterfaceResidues(seqA)\niface.filter { it.isLikelyInterface }\n     .forEach { println(\"Pos ${it.position}: ${it.aminoAcid}\") }\n\nval cc = ProteinInteraction.predictCoiledCoil(seqA)\ncc.forEach { println(\"Coiled coil ${it.start}\u2013${it.end}, p=${it.probability}\") }"}, {"name": "DNAInteraction", "kind": "object", "desc": "DNA-DNA hybridisation thermodynamics (SantaLucia 1998 nearest-neighbour) and primer design.", "props": [], "methods": [["hybridize(seq1, seq2, saltConc, strandConc)", "HybridizationResult", "Full NN thermodynamics: \u0394H, \u0394S, \u0394G37, Tm"], ["designPrimers(template, targetStart, targetEnd, primerLen, tmRange, gcRange)", "Pair<List<Primer>,List<Primer>>", "Design forward and reverse primers with Tm/GC filtering"], ["bindingAffinity(seq1, seq2, topology)", "Double", "Binding \u0394G (kcal/mol); topology: linear|circular"], ["fretEfficiency(r, r0)", "Double", "F\u00f6rster FRET efficiency E = 1/(1+(r/r0)\u2076)"]], "example": "val seq1 = DNASequence(\"ATCGATCGATCGATCG\")\nval seq2 = DNASequence(\"CGATCGATCGATCGAT\")\n\nval hyb = DNAInteraction.hybridize(seq1, seq2, saltConc = 0.05)\nprintln(hyb.tm)      // 49.5 \u00b0C\nprintln(hyb.deltaG37) // \u221214.2 kcal/mol\nprintln(hyb.deltaH)   // \u2212124.0 kcal/mol\n\n// Primer design\nval (fwd, rev) = DNAInteraction.designPrimers(\n    template = DNASequence(\"ATCG\" * 20),\n    targetStart = 20, targetEnd = 50,\n    tmRange = 55.0..65.0, gcRange = 40.0..60.0\n)\nprintln(\"Forward primers: ${fwd.size}\")\nfwd.take(1).forEach { println(it) }"}, {"name": "RNAInteraction", "kind": "object", "desc": "RNA secondary structure prediction, RNA-RNA hybridisation, and miRNA target analysis.", "props": [], "methods": [["fold(seq)", "RNAStructure", "Nussinov maximum base-pair algorithm; returns dot-bracket and approximate \u0394G"], ["hybridize(seq1, seq2)", "Double", "Intermolecular hybridisation \u0394G estimate (kcal/mol)"], ["predictMiRNATargets(miRNA, mRNA, minSeedLength)", "List<MiRNATarget>", "Seed-region matching: 6-mer, 7mer-A1, 7mer-m8, 8-mer sites"], ["kissLoop(struct1, struct2)", "Double", "Kissing-loop interaction score"]], "example": "val rna = RNASequence(\"GGGGCCCCCAUGGUGCAAAUAGCACUUUAUCCCUGUCC\")\nval fold = RNAInteraction.fold(rna)\nprintln(fold.dotBracket)   // ((((..)))((((((((..).)))))..)))(..)...\nprintln(fold.numBasePairs) // 13\nprintln(fold.freeEnergy)   // \u221218.3 kcal/mol\n\n// miRNA targeting\nval miRNA = RNASequence(\"UAGCUUAUCAGACUGAUGUUGA\")\nval mRNA  = RNASequence(\"GCAGUGAAAUGUUAGAUGAGCUGGGGCC...\")\nval targets = RNAInteraction.predictMiRNATargets(miRNA, mRNA)\ntargets.forEach { println(\"pos=${it.seedMatchPosition}, type=${it.siteType}\") }"}, {"name": "DNARNAInteraction", "kind": "object", "desc": "DNA-RNA hybrid interactions: R-loops, transcription bubbles, and CRISPR guide efficiency.", "props": [], "methods": [["rLoopPropensity(dna, rna)", "Double", "R-loop formation propensity (alignment identity \u00d7 GC content)"], ["transcriptionBubbleStability(dna, windowSize)", "List<Pair<Int,Double>>", "AT-richness profile as melting proxy (higher = easier to open)"], ["crisprGuideEfficiency(guide, target)", "Double", "SpCas9 guide efficiency: PAM check + GC + Doench 2016 position weights"]], "example": "val genomicDNA = DNASequence(\"ATCGATCGATCGATCGATCGATCGATCG\")\nval transcript = RNASequence(\"AUCGAUCGAUCGAUCGAUCGAUC\")\n\nprintln(DNARNAInteraction.rLoopPropensity(genomicDNA, transcript)) // 0.84\n\n// CRISPR guide (must end with NGG PAM)\nval guide = RNASequence(\"GCAAAUAGCACUUUAUCCCU\" + \"GGG\")\nprintln(DNARNAInteraction.crisprGuideEfficiency(guide, genomicDNA)) // 0.0\u20131.0"}]}, "biokt.molinteraction": {"label": "Mol Interactions", "file": "MoleculeInteraction.kt", "desc": "Molecule-to-sequence binding: drug-protein scoring, drug-DNA intercalation/groove binding, drug-RNA affinity, pharmacophore modelling, QSAR, metal-ligand coordination.", "classes": [{"name": "DrugProteinBinding", "kind": "object", "desc": "Empirical drug-protein binding scoring, pharmacophore generation, and linear QSAR.", "props": [], "methods": [["score(drug, protein)", "BindingResult", "ChemScore-inspired empirical scoring: H-bond, hydrophobic, electrostatic, \u03c0-stacking, desolvation"], ["generatePharmacophore(drug)", "Pharmacophore", "Extract pharmacophore features: HBD, HBA, Hydrophobic, Aromatic, Positive, Negative"], ["pharmacophoreMatch(query, candidate)", "Double", "Fraction of pharmacophore features matched (0\u20131)"], ["trainQSAR(drugs, activities)", "QSARModel", "Train linear QSAR model on descriptor-activity pairs"]], "example": "val aspirin = Molecule(\"CC(=O)Oc1ccccc1C(=O)O\", name=\"Aspirin\")\nval cox2    = ProteinSequence(\"MLAVGALLLAGLLLAADAEEFRMKSS...\", id=\"COX2\")\n\nval result = DrugProteinBinding.score(aspirin, cox2)\nprintln(result.bindingScore)    // \u22125.46 kcal/mol\nprintln(result.estimatedKd)     // 141.9 \u03bcM\nprintln(result.confidence)      // 0.43\nprintln(result.isLikelyBinder)  // true\n\nresult.interactions.forEach { i ->\n    println(\"[${i.type}] ${i.strength} kcal/mol: ${i.description}\")\n}\n\n// Pharmacophore\nval pharm = DrugProteinBinding.generatePharmacophore(aspirin)\nprintln(pharm.features.map { it.type })  // [HBD, HBA, Hydrophobic, Aromatic]\n\n// QSAR\nval model = DrugProteinBinding.trainQSAR(drugList, icValues)\nprintln(model.r2)                // training R\u00b2\nprintln(model.predict(newDrug))  // predicted activity"}, {"name": "DrugDNABinding", "kind": "object", "desc": "Drug-DNA interaction modes: intercalation, minor groove binding, covalent risk, and full binding profile.", "props": [], "methods": [["intercalationScore(drug, dna)", "Double", "Planar aromatic system + charge + molecular size score"], ["minorGrooveScore(drug, dna)", "Double", "Crescent shape + AT preference + H-bond donor score"], ["covalentBindingRisk(drug)", "CovalentBindingRisk", "Electrophile detection and structural alert risk assessment"], ["profile(drug, dna)", "DrugDNAProfile", "Full binding profile: mode, scores, \u0394G estimate, covalent risk"]], "example": "val etBr = Molecule(\"CCn1c2cc(N)ccc2cc2ccc(N)cc12\", name=\"Ethidium-like\")\nval dna  = DNASequence(\"ATCGATCGATCGATCG\")\n\nval p = DrugDNABinding.profile(etBr, dna)\nprintln(p.bindingMode)           // \"Minor groove binding\"\nprintln(p.intercalationScore)    // 3.25\nprintln(p.deltaG)                // \u22122.84 kcal/mol\nprintln(p.covalentRisk.riskLevel)// \"Low\"\n\n// Covalent risk for an alkylating agent\nval alkylator = Molecule(\"ClCC(=O)Cl\")\nval risk = DrugDNABinding.covalentBindingRisk(alkylator)\nprintln(risk.riskLevel)          // \"High\"\nprintln(risk.structuralAlerts)"}, {"name": "DrugRNABinding", "kind": "object", "desc": "Drug-RNA binding score based on RNA secondary structure complexity and drug physicochemical properties.", "props": [], "methods": [["score(drug, rna)", "Double", "Combined score: structure complexity + charge + aromaticity + amine count"]], "example": "val aminoglycoside = Molecule(\"OC1CC(N)C(O)C(O)C1N\", name=\"Kanamycin-like\")\nval rnaTarget = RNASequence(\"GCAAAUAGCACUUUAUCCCU\")\n\nval score = DrugRNABinding.score(aminoglycoside, rnaTarget)\nprintln(score)  // 1.14 (higher = stronger predicted binding)"}, {"name": "MetalLigandBinding", "kind": "object", "desc": "Metal detection and coordination analysis for organometallic drugs and metal-binding proteins.", "props": [["METAL_SYMBOLS", "Set<String>", "Recognised metals: Fe, Zn, Cu, Mg, Ca, Mn, Co, Ni, Mo, Se"]], "methods": [["hasMetal(mol)", "Boolean", "True if the molecule contains any recognised metal atom"], ["coordinationScore(mol)", "Double", "Count N/O/S donor atoms coordinating each metal \u00d7 1.5"], ["metalBindingResidues(protein)", "List<Int>", "Positions of His, Cys, Asp, Glu, Met residues"]], "example": "val cisplatin = Molecule(\"[Pt](Cl)(Cl)([NH3])[NH3]\", name=\"Cisplatin\")\nprintln(MetalLigandBinding.hasMetal(cisplatin))        // true\nprintln(MetalLigandBinding.coordinationScore(cisplatin)) // 6.0\n\nval carbAnhyd = ProteinSequence(\"MASPDKTNLK...HIS119...CYS205...\")\nval sites = MetalLigandBinding.metalBindingResidues(carbAnhyd)\nprintln(sites)  // [119, 205, ...]  (His, Cys positions)"}]}};
+
+const KIND_COLOR = {
+  'class':'#56d364','sealed class':'#d2a8ff','data class':'#ffa657',
+  'object':'#79c0ff','enum class':'#f78166','interface':'#ffa657'
+};
+
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Syntax highlight ─────────────────────────────────────────
+function highlight(code){
+  let c = esc(code);
+  const KW = /\b(val|var|fun|class|object|data|sealed|enum|interface|return|if|else|for|while|in|is|as|when|null|true|false|override|companion|import|package|by|lazy|get|set|init|constructor|this|super|throw|try|catch|println|require)\b/g;
+  c = c.replace(KW, '<span class="kw">$1</span>');
+  c = c.replace(/(\/\/[^\n]*)/g, '<span class="cm">$1</span>');
+  c = c.replace(/(&quot;[^&]*&quot;)/g, '<span class="st">$1</span>');
+  c = c.replace(/\b([A-Z][A-Za-z0-9]+)\b/g, '<span class="tp">$1</span>');
+  return c;
+}
+
+// ── Build overview grid ───────────────────────────────────────
+function buildOverview(){
+  const grid = document.getElementById('overview-grid');
+  let html = '';
+  for(const [pkg_id, pkg] of Object.entries(API)){
+    const chips = pkg.classes.map(cls => {
+      const kc = KIND_COLOR[cls.kind] || '#c9d1d9';
+      return `<span class="chip" onclick="showClass('${pkg_id}_${cls.name}')">
+        <span class="dot" style="background:${kc}"></span>
+        <span style="color:${kc}">${esc(cls.name)}</span>
+      </span>`;
+    }).join('');
+    html += `<div class="pkg-card" onclick="showPkg('${pkg_id}')">
+      <h3>${esc(pkg.label)}</h3>
+      <div class="pkg-file">${esc(pkg.file)}</div>
+      <div class="pkg-desc-short">${esc(pkg.desc.substring(0,100))}...</div>
+      <div class="chip-row">${chips}</div>
+    </div>`;
+  }
+  grid.innerHTML = html;
+}
+
+// ── Render a class detail page ────────────────────────────────
+function renderClass(pkg_id, cls){
+  const kc = KIND_COLOR[cls.kind] || '#c9d1d9';
+  const anchor = pkg_id + '_' + cls.name;
+
+  let propsHtml = '';
+  if(cls.props && cls.props.length){
+    let rows = cls.props.map(p => {
+      const pname = p[0], pdesc = p[p.length-1];
+      return `<tr><td class="prop-name">${esc(pname)}</td>
+              <td class="prop-desc">${esc(pdesc)}</td></tr>`;
+    }).join('');
+    propsHtml = `<div class="sub-section">
+      <h4 class="sub-heading">Properties <span class="cnt">${cls.props.length}</span></h4>
+      <table class="mtable"><thead><tr><th>Name / Type</th><th>Description</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+  }
+
+  let methodSummary = '', methodDetail = '';
+  if(cls.methods && cls.methods.length){
+    cls.methods.forEach(m => {
+      if(m.length < 2) return;
+      const mname = m[0], mret = m.length > 2 ? m[1] : '', mdesc = m[m.length-1];
+      const da = (mname+mret).replace(/[^a-zA-Z0-9]/g,'').substring(0,40);
+      const fa = anchor + '_' + da;
+      methodSummary += `<tr>
+        <td class="name"><a href="#${fa}">${esc(mname)}</a></td>
+        <td class="ret">${esc(mret)}</td>
+        <td class="desc">${esc(mdesc)}</td></tr>`;
+      methodDetail += `<div class="method-detail" id="${fa}">
+        <div class="method-sig">${esc(mname)}</div>
+        ${mret ? `<div class="ret-row"><span class="ret-label">Returns</span>
+          <span class="ret-val">${esc(mret)}</span></div>` : ''}
+        <div class="method-desc">${esc(mdesc)}</div>
+      </div>`;
+    });
+    methodSummary = `<div class="sub-section">
+      <h4 class="sub-heading">Method Summary <span class="cnt">${cls.methods.length}</span></h4>
+      <table class="mtable"><thead><tr>
+        <th>Method</th><th>Returns</th><th>Description</th>
+      </tr></thead><tbody>${methodSummary}</tbody></table></div>
+      <div class="sub-section">
+        <h4 class="sub-heading">Method Detail</h4>
+        ${methodDetail}
+      </div>`;
+  }
+
+  let exampleHtml = '';
+  if(cls.example){
+    exampleHtml = `<div class="example-box">
+      <div class="ex-label">▶ Code Example</div>
+      <pre>${highlight(cls.example)}</pre>
+    </div>`;
+  }
+
+  return `<div class="cls-card" id="${anchor}">
+    <div class="cls-header">
+      <span class="kind-badge" style="background:${kc}22;color:${kc};border:1px solid ${kc}44">
+        ${esc(cls.kind)}
+      </span>
+      <h3 class="cls-name">${esc(cls.name)}</h3>
+      <div class="cls-desc">${esc(cls.desc)}</div>
+    </div>
+    <div class="cls-body">
+      ${propsHtml}${methodSummary}${exampleHtml}
+    </div>
+  </div>`;
+}
+
+// ── Navigation ────────────────────────────────────────────────
+let currentPage = 'overview';
+
+function clearActive(){
+  document.querySelectorAll('.nav-overview,.nav-cls').forEach(el => el.classList.remove('active'));
+}
+
+function showOverview(){
+  clearActive();
+  document.getElementById('nav-overview').classList.add('active');
+  document.getElementById('page-overview').style.display = 'block';
+  document.getElementById('detail-container').innerHTML = '';
+  document.getElementById('breadcrumb').innerHTML = '<span class="cur">Overview</span>';
+  currentPage = 'overview';
+}
+
+function showPkg(pkg_id){
+  const pkg = API[pkg_id];
+  clearActive();
+  document.getElementById('page-overview').style.display = 'none';
+  let html = `<div class="pkg-heading">${esc(pkg.label)}
+    <span class="pkg-file">${esc(pkg.file)}</span></div>
+    <div class="pkg-desc">${esc(pkg.desc)}</div>`;
+  pkg.classes.forEach(cls => { html += renderClass(pkg_id, cls); });
+  document.getElementById('detail-container').innerHTML = html;
+  document.getElementById('breadcrumb').innerHTML =
+    `<a href="#" onclick="showOverview();return false">Overview</a> › <span class="cur">${esc(pkg.label)}</span>`;
+  window.scrollTo(0,0);
+  // expand that package in nav
+  const navList = document.getElementById('nav_' + pkg_id);
+  if(navList) navList.style.display = 'block';
+  const arr = document.getElementById('arr_' + pkg_id);
+  if(arr) arr.classList.add('open');
+}
+
+function showClass(anchor){
+  const [pkg_id, ...rest] = anchor.split('_');
+  const clsName = rest.join('_');
+  const pkg = API[pkg_id];
+  if(!pkg) return;
+  const cls = pkg.classes.find(c => c.name === clsName);
+  if(!cls) return;
+  clearActive();
+  document.querySelectorAll('.nav-cls').forEach(el => {
+    if(el.textContent.trim() === clsName) el.classList.add('active');
+  });
+  document.getElementById('page-overview').style.display = 'none';
+  document.getElementById('detail-container').innerHTML = renderClass(pkg_id, cls);
+  document.getElementById('breadcrumb').innerHTML =
+    `<a href="#" onclick="showOverview();return false">Overview</a> › 
+     <a href="#" onclick="showPkg('${pkg_id}');return false">${esc(pkg.label)}</a> › 
+     <span class="cur">${esc(clsName)}</span>`;
+  window.scrollTo(0,0);
+  // expand nav
+  const navList = document.getElementById('nav_' + pkg_id);
+  if(navList) navList.style.display = 'block';
+  const arr = document.getElementById('arr_' + pkg_id);
+  if(arr) arr.classList.add('open');
+}
+
+function togglePkg(pkg_id){
+  const list = document.getElementById('nav_' + pkg_id);
+  const arr  = document.getElementById('arr_' + pkg_id);
+  if(list.style.display === 'none'){
+    list.style.display = 'block'; arr.classList.add('open');
+    showPkg(pkg_id);
+  } else {
+    list.style.display = 'none'; arr.classList.remove('open');
+  }
+}
+
+// ── Search ────────────────────────────────────────────────────
+function filterNav(q){
+  q = q.toLowerCase();
+  document.querySelectorAll('.nav-cls').forEach(el => {
+    const txt = el.textContent.trim().toLowerCase();
+    el.style.display = txt.includes(q) ? '' : 'none';
+  });
+  if(q){
+    document.querySelectorAll('.nav-cls-list').forEach(list => {
+      const visible = [...list.querySelectorAll('.nav-cls')]
+        .some(el => el.style.display !== 'none');
+      list.style.display = visible ? 'block' : '';
+    });
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────
+buildOverview();
+</script>
+</body>
+</html>
