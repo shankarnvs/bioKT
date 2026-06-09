@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Drug Report — Ibuprofen — BioKt Report</title>
+
+<style>
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --blue: #1e40af;
+  --teal: #0f766e;
+  --green: #15803d;
+  --orange: #c2410c;
+  --purple: #6d28d9;
+  --red: #dc2626;
+  --gray: #374151;
+  --lgray: #6b7280;
+  --xlgray: #f1f5f9;
+  --text: #111827;
+  --pass: #dcfce7;
+  --pass-text: #15803d;
+  --fail: #fee2e2;
+  --fail-text: #dc2626;
+  --warn: #fef3c7;
+  --warn-text: #92400e;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg); color:var(--text); font-size:14px; line-height:1.6; }
+a { color:var(--blue); }
+
+/* ── Layout ── */
+.page { max-width:1100px; margin:0 auto; padding:32px 24px 60px; }
+
+/* ── Report header ── */
+.report-header {
+  background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 50%,#0f766e 100%);
+  color:#fff; border-radius:14px; padding:32px 36px; margin-bottom:32px;
+  display:flex; justify-content:space-between; align-items:flex-start;
+  flex-wrap:wrap; gap:16px;
+}
+.report-header h1 { font-size:28px; font-weight:800; margin-bottom:6px; }
+.report-header .subtitle { font-size:14px; opacity:.85; }
+.report-header .meta { text-align:right; font-size:12px; opacity:.8; line-height:1.8; }
+.report-type-badge {
+  display:inline-block; background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.3);
+  border-radius:20px; padding:3px 12px; font-size:12px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;
+}
+
+/* ── Section ── */
+.section { margin-bottom:32px; }
+.section-title {
+  font-size:16px; font-weight:700; color:var(--blue);
+  border-bottom:2px solid var(--border); padding-bottom:8px; margin-bottom:16px;
+  display:flex; align-items:center; gap:8px;
+}
+.section-title .icon { font-size:18px; }
+
+/* ── Summary grid ── */
+.summary-grid {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:12px; margin-bottom:24px;
+}
+.stat-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  padding:14px 16px; text-align:center;
+}
+.stat-card .val { font-size:24px; font-weight:800; color:var(--blue); line-height:1.2; }
+.stat-card .lbl { font-size:11px; color:var(--lgray); margin-top:4px; text-transform:uppercase; letter-spacing:.4px; }
+.stat-card.green .val  { color:var(--green); }
+.stat-card.orange .val { color:var(--orange); }
+.stat-card.purple .val { color:var(--purple); }
+.stat-card.teal .val   { color:var(--teal); }
+.stat-card.red .val    { color:var(--red); }
+
+/* ── Tables ── */
+.data-table { width:100%; border-collapse:collapse; border:1px solid var(--border);
+  border-radius:8px; overflow:hidden; }
+.data-table thead tr { background:var(--blue); }
+.data-table thead th { padding:9px 14px; text-align:left; font-size:12px;
+  font-weight:700; color:#fff; text-transform:uppercase; letter-spacing:.4px; }
+.data-table tbody tr:nth-child(even) { background:var(--xlgray); }
+.data-table tbody tr:hover { background:#e0f2fe; }
+.data-table td { padding:8px 14px; font-size:13px; border-bottom:1px solid var(--border); }
+.data-table td.mono { font-family:'Cascadia Code','Fira Code',monospace; font-size:12px; }
+.data-table td.num { text-align:right; font-variant-numeric:tabular-nums; }
+
+/* ── Badge chips ── */
+.badge {
+  display:inline-block; padding:2px 9px; border-radius:12px; font-size:11px;
+  font-weight:700; text-transform:uppercase; letter-spacing:.3px;
+}
+.badge.pass  { background:var(--pass);  color:var(--pass-text); }
+.badge.fail  { background:var(--fail);  color:var(--fail-text); }
+.badge.warn  { background:var(--warn);  color:var(--warn-text); }
+.badge.info  { background:#dbeafe; color:#1e40af; }
+.badge.purple{ background:#ede9fe; color:#6d28d9; }
+
+/* ── Sequence display ── */
+.seq-display {
+  font-family:'Cascadia Code','Fira Code',monospace; font-size:12px;
+  background:#0f172a; color:#e2e8f0; border-radius:8px; padding:16px 18px;
+  line-height:2; word-break:break-all; overflow-x:auto;
+}
+.seq-display .pos { color:#64748b; font-size:10px; margin-right:8px; user-select:none; }
+.seq-A { color:#f87171; }
+.seq-T { color:#60a5fa; }
+.seq-G { color:#4ade80; }
+.seq-C { color:#facc15; }
+.seq-U { color:#c084fc; }
+
+/* ── GC skew bar ── */
+.skew-bar { height:28px; display:flex; border-radius:6px; overflow:hidden; margin:8px 0; }
+.skew-pos { background:#22c55e; display:flex; align-items:center; justify-content:center;
+  color:#fff; font-size:11px; font-weight:700; }
+.skew-neg { background:#ef4444; display:flex; align-items:center; justify-content:center;
+  color:#fff; font-size:11px; font-weight:700; }
+
+/* ── Horizontal bar chart ── */
+.bar-chart { display:flex; flex-direction:column; gap:5px; }
+.bar-row { display:flex; align-items:center; gap:10px; }
+.bar-row .bar-label { width:40px; text-align:right; font-size:12px; font-weight:700;
+  color:var(--gray); font-family:monospace; }
+.bar-row .bar-track { flex:1; height:18px; background:var(--xlgray);
+  border-radius:4px; overflow:hidden; }
+.bar-row .bar-fill { height:100%; border-radius:4px; display:flex;
+  align-items:center; padding-left:6px; font-size:11px; color:#fff; font-weight:600; }
+.bar-row .bar-val { width:60px; font-size:12px; color:var(--lgray); }
+
+/* ── Dot-bracket structure ── */
+.dot-bracket {
+  font-family:'Cascadia Code','Fira Code',monospace; font-size:12px;
+  background:#1e293b; color:#a5f3fc; border-radius:6px; padding:12px 14px;
+  word-break:break-all; line-height:1.8;
+}
+.dot-bracket .seq-line { color:#94a3b8; }
+.dot-bracket .str-open { color:#f59e0b; }
+.dot-bracket .str-close { color:#f59e0b; }
+.dot-bracket .str-dot  { color:#475569; }
+
+/* ── Radar-like property circle ── */
+.prop-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
+.prop-item {
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:12px 14px; display:flex; flex-direction:column; gap:4px;
+}
+.prop-item .prop-name { font-size:11px; color:var(--lgray); text-transform:uppercase; letter-spacing:.4px; }
+.prop-item .prop-val  { font-size:18px; font-weight:700; color:var(--blue); }
+.prop-item .prop-unit { font-size:11px; color:var(--lgray); }
+.prop-item .prop-bar  { height:5px; background:var(--xlgray); border-radius:3px; margin-top:4px; }
+.prop-item .prop-bar-fill { height:100%; border-radius:3px; background:var(--blue); }
+
+/* ── ORF table ── */
+.orf-row td:first-child { font-family:monospace; }
+
+/* ── Alert box ── */
+.alert { border-radius:8px; padding:12px 16px; margin-bottom:12px;
+  display:flex; gap:12px; align-items:flex-start; }
+.alert.info  { background:#dbeafe; border-left:4px solid var(--blue); }
+.alert.warn  { background:var(--warn); border-left:4px solid #d97706; }
+.alert.danger{ background:var(--fail); border-left:4px solid var(--red); }
+.alert.good  { background:var(--pass); border-left:4px solid var(--green); }
+.alert .alert-icon { font-size:18px; flex-shrink:0; margin-top:1px; }
+.alert .alert-body { font-size:13px; color:var(--gray); }
+.alert .alert-title { font-weight:700; margin-bottom:2px; }
+
+/* ── Divider ── */
+.divider { border:none; border-top:2px solid var(--border); margin:32px 0; }
+
+/* ── Appendix header ── */
+.appendix-header {
+  background:var(--xlgray); border:1px solid var(--border); border-radius:10px;
+  padding:16px 20px; margin-bottom:24px;
+}
+.appendix-header h2 { font-size:20px; font-weight:800; color:var(--gray); }
+.appendix-header p  { font-size:13px; color:var(--lgray); margin-top:4px; }
+
+/* ── Print ── */
+@media print {
+  body { background:#fff; }
+  .page { padding:0; }
+  .report-header { border-radius:0; }
+  .no-print { display:none; }
+}
+
+/* ── Responsive ── */
+@media(max-width:600px) {
+  .report-header { flex-direction:column; }
+  .report-header .meta { text-align:left; }
+  .summary-grid { grid-template-columns:repeat(2,1fr); }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="report-header">
+  <div>
+    <div class="report-type-badge">Drug / Molecule Report</div>
+    <h1>Ibuprofen</h1>
+    <div class="subtitle">SMILES: <span style="font-family:monospace;font-size:13px;opacity:.9">CC(C)Cc1ccc(cc1)C(C)C(=O)O</span></div>
+  </div>
+  <div class="meta">
+    Generated by BioKt v2.0<br>
+    09 Jun 2026 11:02<br>
+    Formula: C13H24O2
+  </div>
+</div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:16px 20px;margin-bottom:28px;" class="no-print">
+  <div style="font-weight:700;color:var(--gray);margin-bottom:10px;font-size:13px;">📋 Contents</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;">
+    <a href="#drug-summary" style="color:var(--blue);text-decoration:none;font-size:13px">▶ Executive Summary</a>
+    <a href="#drug-descriptors" style="color:var(--blue);text-decoration:none;font-size:13px">▶ Molecular Descriptors</a>
+    <a href="#drug-filters" style="color:var(--blue);text-decoration:none;font-size:13px">▶ Drug-Likeness Filters</a>
+    <a href="#drug-admet" style="color:var(--blue);text-decoration:none;font-size:13px">▶ ADMET Profile</a>
+    <a href="#drug-structure" style="color:var(--blue);text-decoration:none;font-size:13px">▶ Structural Analysis</a>
+    <a href="#drug-alerts" style="color:var(--blue);text-decoration:none;font-size:13px">▶ Structural Alerts</a>
+    <a href="#drug-pharm" style="color:var(--blue);text-decoration:none;font-size:13px">▶ Pharmacophore</a>
+    <a href="#drug-appendix" style="color:var(--blue);text-decoration:none;font-size:13px">▶ Detailed Appendix</a>
+  </div>
+</div>
+<div class="section" id="drug-summary">
+  <div class="section-title"><span class="icon">📊</span> Executive Summary</div>
+  <div class="summary-grid">
+    <div class="stat-card "><div class="val">C13H24O2</div><div class="lbl">Formula</div></div>
+    <div class="stat-card blue"><div class="val">212.33</div><div class="lbl">MW (Da)</div></div>
+    <div class="stat-card orange"><div class="val">4.53</div><div class="lbl">LogP</div></div>
+    <div class="stat-card green"><div class="val">37.3 Å²</div><div class="lbl">TPSA</div></div>
+    <div class="stat-card green"><div class="val">4/5</div><div class="lbl">Filters Passed</div></div>
+    <div class="stat-card orange"><div class="val">NO</div><div class="lbl">BBB</div></div>
+    <div class="stat-card green"><div class="val">SAFE</div><div class="lbl">hERG</div></div>
+    <div class="stat-card green"><div class="val">0</div><div class="lbl">Alerts</div></div>
+  </div>
+
+  
+<div class="alert good">
+  <div class="alert-icon">✅</div>
+  <div class="alert-body"><div class="alert-title">Drug-Likeness: Excellent</div>Passes 4/5 drug-likeness filters with no structural alerts. Good candidate for oral drug development.</div>
+</div>
+  
+  
+</div>
+<div class="section" id="drug-descriptors">
+  <div class="section-title"><span class="icon">🔬</span> Molecular Descriptors</div>
+  <div class="prop-grid">
+<div class="prop-item">
+  <div class="prop-name">Molecular Weight</div>
+  <div class="prop-val">212.33</div>
+  <div class="prop-unit">Da</div>
+</div>
+<div class="prop-item">
+  <div class="prop-name">Exact Mass</div>
+  <div class="prop-val">212.3330</div>
+  <div class="prop-unit">Da (monoisotopic)</div>
+</div>
+<div class="prop-item">
+  <div class="prop-name">LogP (Crippen)</div>
+  <div class="prop-val">4.527</div>
+  <div class="prop-unit">lipophilicity</div>
+</div>
+<div class="prop-item">
+  <div class="prop-name">TPSA (Ertl)</div>
+  <div class="prop-val">37.3</div>
+  <div class="prop-unit">Å²</div>
+</div>
+<div class="prop-item">
+  <div class="prop-name">H-Bond Donors</div>
+  <div class="prop-val">1</div>
+  <div class="prop-unit">N-H, O-H</div>
+</div>
+<div class="prop-item">
+  <div class="prop-name">H-Bond Acceptors</div>
+  <div class="prop-val">2</div>
+  <div class="prop-unit">N, O</div>
+</div>
+<div class="prop-item">
+  <div class="prop-name">Rotatable Bonds</div>
+  <div class="prop-val">4</div>
+  <div class="prop-unit">flexibility</div>
+</div>
+<div class="prop-item">
+  <div class="prop-name">Rings</div>
+  <div class="prop-val">1</div>
+  <div class="prop-unit">(aromatic: 1)</div>
+</div>
+<div class="prop-item">
+  <div class="prop-name">Heavy Atoms</div>
+  <div class="prop-val">15</div>
+  <div class="prop-unit">non-hydrogen</div>
+</div>
+<div class="prop-item">
+  <div class="prop-name">fsp3</div>
+  <div class="prop-val">0.462</div>
+  <div class="prop-unit">sp3 carbon fraction</div>
+</div>
+<div class="prop-item">
+  <div class="prop-name">Molar Refractivity</div>
+  <div class="prop-val">27.19</div>
+  <div class="prop-unit">cm³/mol</div>
+</div>
+<div class="prop-item">
+  <div class="prop-name">Stereocenters</div>
+  <div class="prop-val">0</div>
+  <div class="prop-unit">chiral centers</div>
+</div></div>
+</div>
+<div class="section" id="drug-filters">
+  <div class="section-title"><span class="icon">✅</span> Drug-Likeness Filters</div>
+  <table class="data-table"><thead><tr><th>Filter</th><th>Rules</th><th>Result</th><th>Detail</th></tr></thead><tbody><tr><td class="">Lipinski Ro5</td><td class="">MW≤500, LogP≤5, HBD≤5, HBA≤10</td><td class=""><span class="badge pass">PASS</span></td><td class="">MW=212, LogP=4.53, HBD=1, HBA=2</td></tr><tr><td class="">Veber</td><td class="">TPSA≤140 Å², RotBonds≤10</td><td class=""><span class="badge pass">PASS</span></td><td class="">TPSA=37.3, RotB=4</td></tr><tr><td class="">Ghose</td><td class="">MW 160–480, LogP −0.4–5.6, MR 40–130, Atoms 20–70</td><td class=""><span class="badge fail">FAIL</span></td><td class="">MW=212, LogP=4.53, MR=27.2</td></tr><tr><td class="">Egan</td><td class="">LogP −1–6, TPSA≤150 Å²</td><td class=""><span class="badge pass">PASS</span></td><td class="">LogP=4.53, TPSA=37.3</td></tr><tr><td class="">Muegge</td><td class="">9-rule composite (MW, LogP, TPSA, HBD, HBA, rings…)</td><td class=""><span class="badge pass">9/9</span></td><td class="">9 of 9 rules satisfied</td></tr></tbody></table>
+</div>
+<div class="section" id="drug-admet">
+  <div class="section-title"><span class="icon">💊</span> ADMET Profile</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <div>
+      <div style="font-weight:600;color:var(--gray);margin-bottom:10px;font-size:13px;">Absorption & Distribution</div>
+      <table class="data-table"><thead><tr><th>Property</th><th>Prediction</th></tr></thead><tbody><tr><td class="">Oral Bioavailability</td><td class=""><span class="badge warn">Moderate</span></td></tr><tr><td class="">Caco-2 Permeability</td><td class=""><span class="badge pass">High</span></td></tr><tr><td class="">P-gp Substrate</td><td class=""><span class="badge pass">No</span></td></tr><tr><td class="">HIA</td><td class=""><span class="badge warn">Moderate (20-80%)</span></td></tr><tr><td class="">BBB Penetration</td><td class=""><span class="badge pass">No</span></td></tr><tr><td class="">VDss</td><td class="">3.26 L/kg</td></tr><tr><td class="">Plasma Protein Binding</td><td class=""><span class="badge info">High >90%</span></td></tr></tbody></table>
+    </div>
+    <div>
+      <div style="font-weight:600;color:var(--gray);margin-bottom:10px;font-size:13px;">Metabolism, Excretion & Toxicity</div>
+      <table class="data-table"><thead><tr><th>Property</th><th>Prediction</th></tr></thead><tbody><tr><td class="">CYP3A4 Substrate</td><td class=""><span class="badge pass">No</span></td></tr><tr><td class="">CYP2D6 Substrate</td><td class=""><span class="badge pass">No</span></td></tr><tr><td class="">CYP2C9 Substrate</td><td class=""><span class="badge warn">Yes</span></td></tr><tr><td class="">CYP3A4 Inhibitor</td><td class=""><span class="badge pass">No</span></td></tr><tr><td class="">CYP2D6 Inhibitor</td><td class=""><span class="badge pass">No</span></td></tr><tr><td class="">Half-Life</td><td class=""><span class="badge info">Moderate 2-8h</span></td></tr><tr><td class="">Renal Clearance</td><td class=""><span class="badge info">Low/Moderate</span></td></tr><tr><td class="">hERG Inhibition</td><td class=""><span class="badge pass">Low risk</span></td></tr><tr><td class="">Ames Mutagenicity</td><td class=""><span class="badge pass">Non-mutagenic</span></td></tr><tr><td class="">Oral Toxicity</td><td class=""><span class="badge warn">Class II (Moderate risk)</span></td></tr><tr><td class="">Skin Sensitisation</td><td class=""><span class="badge pass">Low risk</span></td></tr></tbody></table>
+    </div>
+  </div>
+  
+<div class="alert warn">
+  <div class="alert-icon">⚠️</div>
+  <div class="alert-body"><div class="alert-title">ADMET Disclaimer</div>All ADMET values are rule-based in silico estimates. They are not validated clinical predictions. Do not use for clinical or regulatory decisions.</div>
+</div>
+</div>
+<div class="section" id="drug-structure">
+  <div class="section-title"><span class="icon">🧪</span> Structural Analysis</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+    <div>
+      <div style="font-weight:600;color:var(--gray);margin-bottom:10px;font-size:13px;">Atom Inventory</div>
+      <table class="data-table"><thead><tr><th>Element</th><th>Count</th><th>Aromatic?</th></tr></thead><tbody><tr><td class="mono">C</td><td class="num">13</td><td class=""><span class="badge info">Yes</span></td></tr><tr><td class="mono">O</td><td class="num">2</td><td class="">No</td></tr></tbody></table>
+    </div>
+    <div>
+      <div style="font-weight:600;color:var(--gray);margin-bottom:10px;font-size:13px;">Bond Inventory</div>
+      <table class="data-table"><thead><tr><th>Bond Type</th><th>Count</th><th>Order</th></tr></thead><tbody><tr><td class="">SINGLE</td><td class="num">9</td><td class="num">1.0</td></tr><tr><td class="">DOUBLE</td><td class="num">1</td><td class="num">2.0</td></tr><tr><td class="">AROMATIC</td><td class="num">5</td><td class="num">1.5</td></tr></tbody></table>
+      <div style="margin-top:14px;">
+      <table class="data-table"><thead><tr><th>Ring Property</th><th>Count</th></tr></thead><tbody><tr><td class="">Total Rings</td><td class="num">1</td></tr><tr><td class="">Aromatic Rings</td><td class="num">1</td></tr><tr><td class="">Non-aromatic Rings</td><td class="num">0</td></tr></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="section" id="drug-alerts">
+  <div class="section-title"><span class="icon">🚨</span> Structural Alerts</div>
+  
+<div class="alert good">
+  <div class="alert-icon">✅</div>
+  <div class="alert-body"><div class="alert-title">No Structural Alerts</div>No PAINS or reactive group alerts detected across all 15 heavy atoms.</div>
+</div>
+</div>
+<div class="section" id="drug-pharm">
+  <div class="section-title"><span class="icon">🎯</span> Pharmacophore Features</div>
+  <div style="margin-bottom:10px;font-size:13px;color:var(--lgray)">
+    4 pharmacophore feature(s) identified.
+  </div>
+  <table class="data-table"><thead><tr><th>Feature Type</th><th>Atom Count</th><th>Atom Indices (first 6)</th></tr></thead><tbody><tr><td class=""><span class="badge pass">HBD</span></td><td class="num">1</td><td class="mono">14</td></tr><tr><td class=""><span class="badge info">HBA</span></td><td class="num">2</td><td class="mono">13, 14</td></tr><tr><td class=""><span class="badge info">Hydrophobic</span></td><td class="num">7</td><td class="mono">0, 1, 2, 3, 10, 11</td></tr><tr><td class=""><span class="badge purple">Aromatic</span></td><td class="num">6</td><td class="mono">4, 5, 6, 7, 8, 9</td></tr></tbody></table>
+</div>
+<hr class="divider">
+<div id="drug-appendix">
+  <div class="appendix-header">
+    <h2>📎 Detailed Appendix</h2>
+    <p>Full descriptor values, fingerprint density, and atom detail table</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">A1 — Complete Descriptor Table</div>
+    <table class="data-table"><thead><tr><th>Descriptor</th><th>Value</th><th>Notes</th></tr></thead><tbody><tr><td class="">Molecular Formula</td><td class="">C13H24O2</td><td class="">Hill order</td></tr><tr><td class="">Exact (Monoisotopic) Mass</td><td class="">212.3330 Da</td><td class=""></td></tr><tr><td class="">Average Molecular Weight</td><td class="">212.3330 Da</td><td class=""></td></tr><tr><td class="">LogP (Wildman-Crippen)</td><td class="">4.5266</td><td class="">Lipophilicity</td></tr><tr><td class="">H-Bond Donors</td><td class="">1</td><td class="">N-H, O-H groups</td></tr><tr><td class="">H-Bond Acceptors</td><td class="">2</td><td class="">N, O atoms</td></tr><tr><td class="">TPSA (Ertl 2000)</td><td class="">37.30 Å²</td><td class=""></td></tr><tr><td class="">Rotatable Bonds</td><td class="">4</td><td class="">Non-terminal, non-ring</td></tr><tr><td class="">Rings (total)</td><td class="">1</td><td class=""></td></tr><tr><td class="">Aromatic Rings</td><td class="">1</td><td class=""></td></tr><tr><td class="">Heavy Atoms</td><td class="">15</td><td class="">Non-H</td></tr><tr><td class="">Total Atoms (incl. H)</td><td class="">39</td><td class=""></td></tr><tr><td class="">Bonds</td><td class="">15</td><td class=""></td></tr><tr><td class="">Stereocenters</td><td class="">0</td><td class="">Approx.</td></tr><tr><td class="">Fraction sp3 Carbons</td><td class="">0.4615</td><td class="">fsp3</td></tr><tr><td class="">Molar Refractivity</td><td class="">27.186</td><td class="">Wildman-Crippen</td></tr><tr><td class="">Aromatic Atoms</td><td class="">6</td><td class=""></td></tr><tr><td class="">Lipinski Ro5</td><td class="">PASS</td><td class=""></td></tr><tr><td class="">Veber Rules</td><td class="">PASS</td><td class=""></td></tr><tr><td class="">Ghose Filter</td><td class="">FAIL</td><td class=""></td></tr><tr><td class="">Egan Filter</td><td class="">PASS</td><td class=""></td></tr><tr><td class="">Muegge Score</td><td class="">9/9</td><td class=""></td></tr></tbody></table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">A2 — Morgan Fingerprint Density</div>
+    <div style="font-size:13px;color:var(--lgray);margin-bottom:10px;">
+      Bits set: 33 / 1024 (3.2% density)
+      &nbsp;|&nbsp; MACCS bits set: 5 / 166
+    </div>
+    <div style="font-family:monospace;font-size:10px;color:var(--lgray);line-height:1.6;word-break:break-all;background:var(--xlgray);padding:10px;border-radius:6px;">
+      000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000<span style='color:#3b82f6'>1</span>00000000000000000000000000000000000000000000000000000000000000<span style='color:#3b82f6'>1</span>00<span style='color:#3b82f6'>1</span>00000000000000000000000000000<span style='color:#3b82f6'>1</span>00<span style='color:#3b82f6'>1</span>00<span style='color:#3b82f6'>1</span>00<span style='color:#3b82f6'>1</span><span style='color:#3b82f6'>1</span>00<span style='color:#3b82f6'>1</span>000000000000000000000<span style='color:#3b82f6'>1</span>000000000000000000000000<span style='color:#3b82f6'>1</span>0<span style='color:#3b82f6'>1</span><span style='color:#3b82f6'>1</span>0<span style='color:#3b82f6'>1</span>0000…
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">A3 — Atom Detail Table</div>
+    <table class="data-table"><thead><tr><th>Index</th><th>Symbol</th><th>Atomic #</th><th>Aromatic</th><th>Charge</th><th>Implicit H</th><th>Total H</th></tr></thead><tbody><tr><td class="num">0</td><td class="mono">C</td><td class="num">6</td><td class="">No</td><td class="">0</td><td class="num">3</td><td class="num">3</td></tr><tr><td class="num">1</td><td class="mono">C</td><td class="num">6</td><td class="">No</td><td class="">0</td><td class="num">1</td><td class="num">1</td></tr><tr><td class="num">2</td><td class="mono">C</td><td class="num">6</td><td class="">No</td><td class="">0</td><td class="num">3</td><td class="num">3</td></tr><tr><td class="num">3</td><td class="mono">C</td><td class="num">6</td><td class="">No</td><td class="">0</td><td class="num">2</td><td class="num">2</td></tr><tr><td class="num">4</td><td class="mono">C</td><td class="num">6</td><td class=""><span class="badge info">Yes</span></td><td class="">0</td><td class="num">1</td><td class="num">1</td></tr><tr><td class="num">5</td><td class="mono">C</td><td class="num">6</td><td class=""><span class="badge info">Yes</span></td><td class="">0</td><td class="num">2</td><td class="num">2</td></tr><tr><td class="num">6</td><td class="mono">C</td><td class="num">6</td><td class=""><span class="badge info">Yes</span></td><td class="">0</td><td class="num">2</td><td class="num">2</td></tr><tr><td class="num">7</td><td class="mono">C</td><td class="num">6</td><td class=""><span class="badge info">Yes</span></td><td class="">0</td><td class="num">2</td><td class="num">2</td></tr><tr><td class="num">8</td><td class="mono">C</td><td class="num">6</td><td class=""><span class="badge info">Yes</span></td><td class="">0</td><td class="num">1</td><td class="num">1</td></tr><tr><td class="num">9</td><td class="mono">C</td><td class="num">6</td><td class=""><span class="badge info">Yes</span></td><td class="">0</td><td class="num">2</td><td class="num">2</td></tr><tr><td class="num">10</td><td class="mono">C</td><td class="num">6</td><td class="">No</td><td class="">0</td><td class="num">1</td><td class="num">1</td></tr><tr><td class="num">11</td><td class="mono">C</td><td class="num">6</td><td class="">No</td><td class="">0</td><td class="num">3</td><td class="num">3</td></tr><tr><td class="num">12</td><td class="mono">C</td><td class="num">6</td><td class="">No</td><td class="">0</td><td class="num">0</td><td class="num">0</td></tr><tr><td class="num">13</td><td class="mono">O</td><td class="num">8</td><td class="">No</td><td class="">0</td><td class="num">0</td><td class="num">0</td></tr><tr><td class="num">14</td><td class="mono">O</td><td class="num">8</td><td class="">No</td><td class="">0</td><td class="num">1</td><td class="num">1</td></tr></tbody></table>
+  </div>
+</div>
+</div>
+<script>
+// Smooth scroll for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelector(a.getAttribute('href'))?.scrollIntoView({behavior:'smooth'});
+  });
+});
+</script>
+</body>
+</html>
