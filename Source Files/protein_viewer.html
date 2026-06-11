@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BioKt — Protein 3D Viewer</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden}
+#canvas{display:block;width:100vw;height:100vh}
+#ui{position:fixed;top:0;left:0;right:0;padding:14px 20px;background:linear-gradient(180deg,rgba(13,17,23,.95) 0%,transparent 100%);display:flex;align-items:center;gap:16px;z-index:10;pointer-events:none}
+#ui .logo{font-size:14px;font-weight:800;color:#58a6ff}
+#ui .title{font-size:13px;color:#8b949e}
+#controls{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:10px;flex-wrap:wrap;justify-content:center;z-index:10}
+.btn{background:rgba(31,97,235,.85);border:1px solid #1f6feb;color:#fff;padding:8px 18px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;backdrop-filter:blur(8px);transition:all .2s;pointer-events:all}
+.btn:hover{background:#1f6feb;transform:translateY(-1px)}
+.btn.active{background:#0f766e;border-color:#0f766e}
+#legend{position:fixed;top:60px;right:20px;background:rgba(22,27,34,.9);border:1px solid #30363d;border-radius:10px;padding:14px 16px;z-index:10}
+#legend h3{font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.legend-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;color:#c9d1d9}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+#info{position:fixed;top:60px;left:20px;background:rgba(22,27,34,.9);border:1px solid #30363d;border-radius:10px;padding:14px 16px;z-index:10;font-size:12px;color:#8b949e;line-height:1.9}
+#info .val{color:#58a6ff;font-weight:700}
+#back-btn{position:fixed;top:14px;right:20px;pointer-events:all;z-index:20}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="ui">
+  <div class="logo">BioKt v2.0</div>
+  <div class="title">Protein Secondary Structure — 3D Viewer</div>
+</div>
+<div id="legend">
+  <h3>Secondary Structure</h3>
+  <div class="legend-row"><div class="legend-dot" style="background:#f87171"></div>α-Helix</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#60a5fa"></div>β-Sheet</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#4ade80"></div>Turn / Loop</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#facc15"></div>Hydrophobic</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#c084fc"></div>Charged</div>
+</div>
+<div id="info">
+  <div>Sequence: <span class="val" id="info-seq">—</span></div>
+  <div>Length: <span class="val" id="info-len">—</span> aa</div>
+  <div>Helices: <span class="val" id="info-helix">—</span></div>
+  <div>Sheets: <span class="val" id="info-sheet">—</span></div>
+  <div>GRAVY: <span class="val" id="info-gravy">—</span></div>
+</div>
+<div id="controls">
+  <button class="btn active" onclick="setStyle('ribbon')">🎗️ Ribbon</button>
+  <button class="btn" onclick="setStyle('balls')">⚫ Ball-Chain</button>
+  <button class="btn" onclick="setStyle('surface')">🌐 Surface</button>
+  <button class="btn" onclick="setColoring('structure')">🎨 By Structure</button>
+  <button class="btn" onclick="setColoring('hydro')">🌡️ Hydrophobicity</button>
+  <button class="btn" onclick="toggleSpin()">⟳ Auto Spin</button>
+  <button class="btn" onclick="resetCamera()">⊙ Reset</button>
+</div>
+<a href="javascript:history.back()" id="back-btn">
+  <button class="btn">← Back to Report</button>
+</a>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const renderer = new THREE.WebGLRenderer({canvas:document.getElementById('canvas'),antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d1117);
+scene.fog = new THREE.Fog(0x0d1117, 60, 120);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 300);
+camera.position.set(0, 8, 28);
+camera.lookAt(0,0,0);
+
+// Lighting
+scene.add(new THREE.AmbientLight(0x1e3a5f, 1.0));
+const sun = new THREE.DirectionalLight(0x60a5fa, 1.5); sun.position.set(8,15,10); sun.castShadow=true; scene.add(sun);
+const fill = new THREE.DirectionalLight(0xf472b6, 0.5); fill.position.set(-10,-8,-5); scene.add(fill);
+const p1 = new THREE.PointLight(0x22d3ee, 1.0, 50); p1.position.set(0,12,0); scene.add(p1);
+
+// Sequence from URL
+const params = new URLSearchParams(location.search);
+const seq = (params.get('seq') || 'MKALVLLYLLFSSAYSRGVFRRDTHKPPVYKKVEHPLSPSTVQQLLQNLEKAMVRRAAGSPVHILFLGKAM').toUpperCase();
+document.getElementById('info-seq').textContent = seq.length>18 ? seq.substring(0,18)+'…' : seq;
+document.getElementById('info-len').textContent = seq.length;
+
+// Amino acid properties
+const AA_HYDRO = {A:1.8,R:-4.5,N:-3.5,D:-3.5,C:2.5,Q:-3.5,E:-3.5,G:-0.4,H:-3.2,
+  I:4.5,L:3.8,K:-3.9,M:1.9,F:2.8,P:-1.6,S:-0.8,T:-0.7,V:4.2,W:-0.9,Y:-1.3};
+const AA_HELIX = {A:1.44,E:1.44,L:1.40,M:1.36,Q:1.33,K:1.23,R:1.37,H:1.05,
+  V:1.31,I:1.40,F:1.19,W:1.08,C:1.04,T:0.87,Y:0.87,S:0.99};
+const CHARGED = new Set(['R','K','H','D','E']);
+const HYDROPHOBIC_AA = new Set(['A','V','I','L','M','F','W','P']);
+
+// Predict secondary structure (simplified Chou-Fasman-like)
+function predictSS(seq) {
+  const n = seq.length;
+  const ss = new Array(n).fill('C'); // default coil
+
+  // Helix: score window of 6, high helix propensity
+  for (let i = 0; i <= n - 6; i++) {
+    let score = 0;
+    for (let j = i; j < i+6; j++) score += (AA_HELIX[seq[j]] || 0.9);
+    if (score / 6 >= 1.1) for (let j = i; j < i+6; j++) ss[j] = 'H';
+  }
+
+  // Beta sheet: alternating hydrophobic/hydrophilic in window of 4
+  for (let i = 0; i <= n - 4; i++) {
+    if (ss[i] === 'H') continue;
+    let hydros = 0;
+    for (let j = i; j < i+4; j++) if (HYDROPHOBIC_AA.has(seq[j])) hydros++;
+    if (hydros >= 2) for (let j = i; j < i+4; j++) if (ss[j] !== 'H') ss[j] = 'E';
+  }
+
+  // Turns before/after helices
+  for (let i = 1; i < n-1; i++) {
+    if (ss[i-1] === 'H' && ss[i+1] === 'E') ss[i] = 'T';
+    if (ss[i-1] === 'E' && ss[i+1] === 'H') ss[i] = 'T';
+  }
+  return ss;
+}
+
+const ssArr = predictSS(seq);
+const helixCount = ssArr.filter(s=>s==='H').length;
+const sheetCount = ssArr.filter(s=>s==='E').length;
+document.getElementById('info-helix').textContent = helixCount + ' aa';
+document.getElementById('info-sheet').textContent = sheetCount + ' aa';
+
+// GC equiv for protein — avg hydrophobicity
+const gravyVal = seq.split('').reduce((s,c)=>s+(AA_HYDRO[c]||0),0)/seq.length;
+document.getElementById('info-gravy').textContent = gravyVal.toFixed(3);
+
+// ── Generate 3D backbone path ─────────────────────────────────
+function generateBackbone(seq, ss) {
+  const pts = [];
+  const n = seq.length;
+  let x=0, y=0, z=0;
+  let dx=0.8, dy=0, dz=0;
+
+  for (let i = 0; i < n; i++) {
+    pts.push(new THREE.Vector3(x,y,z));
+
+    const s = ss[i];
+    if (s === 'H') {
+      // Helix: rise + twist around axis
+      const ang = i * (Math.PI * 2 / 3.6);
+      dx = Math.cos(ang) * 0.4;
+      dz = Math.sin(ang) * 0.4;
+      dy = 0.5;
+    } else if (s === 'E') {
+      // Sheet: extended zigzag
+      dy = (i%2===0 ? 0.2 : -0.2);
+      dx = 0.9;
+      dz = (i%3===0 ? 0.3 : -0.3);
+    } else {
+      // Coil/turn: semi-random but smooth
+      const seed = (i * 1.618 + seq.charCodeAt(i) * 0.01) % (Math.PI*2);
+      dx = Math.cos(seed) * 0.5 + 0.3;
+      dy = Math.sin(seed * 0.7) * 0.4;
+      dz = Math.sin(seed) * 0.5;
+    }
+    x+=dx; y+=dy; z+=dz;
+  }
+
+  // Center
+  const cx = pts.reduce((s,p)=>s+p.x,0)/n;
+  const cy = pts.reduce((s,p)=>s+p.y,0)/n;
+  const cz = pts.reduce((s,p)=>s+p.z,0)/n;
+  pts.forEach(p => { p.x-=cx; p.y-=cy; p.z-=cz; });
+  return pts;
+}
+
+const backbonePts = generateBackbone(seq, ssArr);
+
+// ── Color schemes ─────────────────────────────────────────────
+function colorByStructure(aa, ss) {
+  if (ss==='H') return new THREE.Color(0xf87171);
+  if (ss==='E') return new THREE.Color(0x60a5fa);
+  if (ss==='T') return new THREE.Color(0xfacc15);
+  return new THREE.Color(0x4ade80);
+}
+
+function colorByHydro(aa) {
+  const h = AA_HYDRO[aa] || 0;
+  const t = (h + 4.5) / 9.0; // 0–1
+  return new THREE.Color().setHSL(0.6 - t * 0.6, 0.8, 0.5);
+}
+
+function colorByCharge(aa) {
+  if ('RKH'.includes(aa)) return new THREE.Color(0x3b82f6);
+  if ('DE'.includes(aa))  return new THREE.Color(0xef4444);
+  return new THREE.Color(0x94a3b8);
+}
+
+// ── Build scene objects ───────────────────────────────────────
+const proteinGroup = new THREE.Group();
+scene.add(proteinGroup);
+
+// Smooth backbone tube
+const curve = new THREE.CatmullRomCurve3(backbonePts);
+const N = seq.length;
+
+// -- Ribbon segments per secondary structure
+let currentSS = ssArr[0], segStart = 0;
+const segments = [];
+for (let i = 1; i <= N; i++) {
+  if (i === N || ssArr[i] !== currentSS) {
+    segments.push({ ss: currentSS, start: segStart, end: i-1 });
+    if (i < N) { currentSS = ssArr[i]; segStart = i; }
+  }
+}
+
+// Helix ribbons
+segments.filter(s=>s.ss==='H').forEach(seg => {
+  const pts = backbonePts.slice(seg.start, seg.end+1);
+  if (pts.length < 2) return;
+  const c = new THREE.CatmullRomCurve3(pts);
+  const geo = new THREE.TubeGeometry(c, pts.length*4, 0.45, 8, false);
+  const mat = new THREE.MeshPhongMaterial({ color:0xf87171, shininess:100,
+    specular:new THREE.Color(0xffc0cb), emissive:new THREE.Color(0x7f1d1d), emissiveIntensity:0.15 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData = { style:'ribbon', ss:'H' };
+  mesh.castShadow = true;
+  proteinGroup.add(mesh);
+});
+
+// Sheet arrows
+segments.filter(s=>s.ss==='E').forEach(seg => {
+  const pts = backbonePts.slice(seg.start, seg.end+1);
+  if (pts.length < 2) return;
+  const c = new THREE.CatmullRomCurve3(pts);
+  const geo = new THREE.TubeGeometry(c, pts.length*3, 0.3, 4, false);
+  const mat = new THREE.MeshPhongMaterial({ color:0x60a5fa, shininess:80,
+    specular:new THREE.Color(0x93c5fd), emissive:new THREE.Color(0x1e3a8a), emissiveIntensity:0.12 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData = { style:'ribbon', ss:'E' };
+  mesh.castShadow = true;
+  proteinGroup.add(mesh);
+});
+
+// Coil/loop as thin tube
+segments.filter(s=>s.ss!=='H'&&s.ss!=='E').forEach(seg => {
+  const pts = backbonePts.slice(seg.start, seg.end+1);
+  if (pts.length < 2) return;
+  const c = new THREE.CatmullRomCurve3(pts);
+  const geo = new THREE.TubeGeometry(c, pts.length*2, 0.12, 6, false);
+  const mat = new THREE.MeshPhongMaterial({ color: seg.ss==='T' ? 0xfacc15 : 0x4ade80, shininess:40 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData = { style:'ribbon', ss:seg.ss };
+  proteinGroup.add(mesh);
+});
+
+// Ball-chain (residue spheres)
+const ballMeshes = [];
+backbonePts.forEach((pt, i) => {
+  const aa = seq[i];
+  const ss = ssArr[i];
+  const col = colorByStructure(aa, ss);
+  const r = HYDROPHOBIC_AA.has(aa) ? 0.28 : (CHARGED.has(aa) ? 0.32 : 0.22);
+  const geo = new THREE.SphereGeometry(r, 10, 10);
+  const mat = new THREE.MeshPhongMaterial({ color:col, shininess:90, specular:new THREE.Color(0xffffff) });
+  const m = new THREE.Mesh(geo, mat);
+  m.position.copy(pt);
+  m.userData = { style:'balls', aa, ss, index:i, origColor:col.clone() };
+  m.visible = false;
+  m.castShadow = true;
+  proteinGroup.add(m);
+  ballMeshes.push(m);
+
+  // Bond between consecutive residues
+  if (i > 0) {
+    const prev = backbonePts[i-1];
+    const dir = new THREE.Vector3().subVectors(pt, prev);
+    const len = dir.length();
+    const mid = new THREE.Vector3().addVectors(prev, pt).multiplyScalar(0.5);
+    const bGeo = new THREE.CylinderGeometry(0.06, 0.06, len, 5);
+    const bMat = new THREE.MeshPhongMaterial({ color:0x475569 });
+    const bond = new THREE.Mesh(bGeo, bMat);
+    bond.position.copy(mid);
+    bond.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.normalize());
+    bond.userData = { style:'balls' };
+    bond.visible = false;
+    proteinGroup.add(bond);
+  }
+});
+
+// Surface blob
+const surfaceGeo = new THREE.SphereGeometry(10, 32, 32);
+const surfaceMat = new THREE.MeshPhongMaterial({
+  color:0x22d3ee, transparent:true, opacity:0.09, wireframe:false, side:THREE.DoubleSide
+});
+const surfaceMesh = new THREE.Mesh(surfaceGeo, surfaceMat);
+surfaceMesh.userData = { style:'surface' };
+surfaceMesh.visible = false;
+proteinGroup.add(surfaceMesh);
+
+// Stars
+const sg = new THREE.BufferGeometry();
+const sv = [];
+for (let i=0;i<1500;i++) sv.push((Math.random()-.5)*200,(Math.random()-.5)*200,(Math.random()-.5)*200);
+sg.setAttribute('position',new THREE.Float32BufferAttribute(sv,3));
+scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0x4b5563,size:0.2})));
+
+// Grid
+const grid = new THREE.GridHelper(40,20,0x1e3a5f,0x1e3a5f);
+grid.position.y = -12;
+scene.add(grid);
+
+// ── Interaction ───────────────────────────────────────────────
+let isDragging=false,lastX=0,lastY=0,rotY=0,rotX=0.2,targetRotY=0,targetRotX=0.2,zoom=28,targetZoom=28;
+let spinning=true, currentStyle='ribbon', currentColoring='structure';
+
+document.getElementById('canvas').addEventListener('mousedown',e=>{isDragging=true;lastX=e.clientX;lastY=e.clientY});
+document.addEventListener('mouseup',()=>isDragging=false);
+document.addEventListener('mousemove',e=>{
+  if(!isDragging)return;
+  targetRotY+=(e.clientX-lastX)*0.005;
+  targetRotX+=(e.clientY-lastY)*0.005;
+  targetRotX=Math.max(-1.2,Math.min(1.2,targetRotX));
+  lastX=e.clientX;lastY=e.clientY;
+});
+document.getElementById('canvas').addEventListener('wheel',e=>{targetZoom=Math.max(5,Math.min(60,targetZoom+e.deltaY*0.02))});
+
+function setStyle(v) {
+  currentStyle=v;
+  document.querySelectorAll('.btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  proteinGroup.traverse(c=>{
+    if(!c.isMesh) return;
+    const s=c.userData.style;
+    if(!s) return;
+    c.visible = s===v || v==='surface'&&(s==='ribbon'||s==='surface');
+    if(v==='surface'&&c===surfaceMesh) c.visible=true;
+  });
+}
+
+function setColoring(mode) {
+  currentColoring=mode;
+  ballMeshes.forEach(m=>{
+    const col = mode==='hydro' ? colorByHydro(m.userData.aa) : colorByStructure(m.userData.aa, m.userData.ss);
+    m.material.color.copy(col);
+  });
+}
+
+function toggleSpin(){
+  spinning=!spinning;
+  event.target.textContent=spinning?'⟳ Auto Spin':'⏸ Paused';
+  event.target.classList.toggle('active',spinning);
+}
+function resetCamera(){targetRotY=0;targetRotX=0.2;targetZoom=28;}
+
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);
+  t+=0.006;
+  rotY+=(targetRotY-rotY)*0.08;
+  rotX+=(targetRotX-rotX)*0.08;
+  zoom+=(targetZoom-zoom)*0.08;
+  if(spinning) targetRotY+=0.003;
+  p1.position.set(Math.cos(t)*14,12+Math.sin(t*0.4)*4,Math.sin(t)*10);
+  const cx=zoom*Math.cos(rotX)*Math.sin(rotY);
+  const cy=zoom*Math.sin(rotX);
+  const cz=zoom*Math.cos(rotX)*Math.cos(rotY);
+  camera.position.set(cx,cy,cz);
+  camera.lookAt(0,0,0);
+  renderer.render(scene,camera);
+}
+animate();
+
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>

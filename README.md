@@ -5,7 +5,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.3%2B-blue?logo=kotlin)](https://kotlinlang.org)
 [![JVM](https://img.shields.io/badge/JVM-8%2B-orange?logo=java)](https://openjdk.org)
 [![Tests](https://img.shields.io/badge/Tests-39%2F39%20passing-brightgreen)](#testing)
-[![License](https://img.shields.io/badge/License-MIT-lightgrey)](#license)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey)](#-license--disclaimer)
 [![AI Assisted](https://img.shields.io/badge/Built%20with-Claude%20AI-blueviolet?logo=anthropic)](https://claude.ai)
 
 > 🤖 **This project was developed with the assistance of [Claude](https://claude.ai) (Anthropic's AI assistant).** The library architecture, all source code, documentation, API reference, and this README were generated through an iterative collaboration between a human developer and Claude. See the [AI Collaboration](#-ai-collaboration) section for details.
@@ -38,7 +38,7 @@ val score  = DrugProteinBinding.score(drug, prot)       // –5.46 kcal/mol
 - [Documentation](#-documentation)
 - [AI Collaboration](#-ai-collaboration)
 - [Comparison with BioPython](#-comparison-with-biopython)
-- [License](#-license)
+- [License & Disclaimer](#-license--disclaimer)
 
 ---
 
@@ -64,9 +64,12 @@ val score  = DrugProteinBinding.score(drug, prot)       // –5.46 kcal/mol
 | **Drug-DNA** | Intercalation scoring, minor groove binding, covalent risk profiling |
 | **Drug-Protein** | Empirical binding score, pharmacophore generation & matching, linear QSAR |
 | **CRISPR** | SpCas9 guide efficiency, R-loop propensity, transcription bubble stability |
+| **ML Prediction** | Pretrained classifiers: coding/non-coding DNA, promoter, splice site, enzyme, membrane, drug activity, toxicity (Cramer I/II/III), hERG risk |
+| **Custom Models** | Load any scikit-learn / R / Weka model from JSON weight files — Naive Bayes, kNN, Decision Tree, Random Forest, Logistic Regression |
+| **LLM Integration** | OpenAI GPT-4o, Anthropic Claude, Google Gemini, Ollama (local) — biological interpretation of sequences, proteins, and drug molecules |
 | **Metal-Ligand** | Metal detection, coordination scoring, metal-binding residue prediction |
 
-**Stats:** 14 source files · 4,654 lines · 58 classes/objects · 159 public functions · 39/39 tests passing
+**Stats:** 19 source files · 6,138 lines · 66 classes/objects · 177 public functions · 39/39 tests passing
 
 ---
 
@@ -111,6 +114,10 @@ biokt/
 ├── ProteinDescriptors.kt# ProteinDescriptors (AAC, DPC, CTD, QSO, PAAC, …)
 ├── SequenceInteraction.kt # ProteinInteraction, DNAInteraction, RNAInteraction, DNARNAInteraction
 ├── MoleculeInteraction.kt # DrugProteinBinding, DrugDNABinding, DrugRNABinding, MetalLigandBinding
+├── MLPredictor.kt       # Pretrained ML classifiers (NaiveBayes, kNN, RF, DT, Linear)
+├── GPTClient.kt         # Multi-provider LLM client (OpenAI, Anthropic, Google, Ollama)
+├── ReportGenerator.kt   # HTML report generation with embedded 3D viewers
+├── Viewer3D.kt          # Three.js 3D viewers (DNA helix, protein, molecule)
 ├── TestRunner.kt        # Self-contained 39-test suite (no JUnit needed)
 └── Main.kt              # Demo entry point
 ```
@@ -223,6 +230,60 @@ result.interactions.forEach { i ->
 }
 ```
 
+### ML prediction (pretrained models, no training needed)
+
+```kotlin
+// DNA — coding, promoter, splice site
+val mlDNA = SequenceMLPredictor.fullAnalysis(dna)
+mlDNA.forEach { (task, pred) ->
+    println("$task: ${pred.label}  confidence=${pred.confidence}")
+}
+// coding:      coding      (83.2%)
+// promoter:    non-promoter (91.4%)
+// splice_site: non-splice  (76.8%)
+
+// Protein — enzyme vs non-enzyme, membrane vs soluble
+val mlProt = ProteinMLPredictor.fullAnalysis(prot)
+
+// Drug — activity, toxicity class, hERG risk
+val mlDrug = DrugMLPredictor.fullAnalysis(mol)
+mlDrug.forEach { (task, pred) ->
+    println("$task: ${pred.label}  (${pred.confidence})")
+}
+// activity:  active        (72%)
+// toxicity:  class_I_low   (81%)
+// herg_risk: non-inhibitor (84%)
+```
+
+### LLM biological interpretation
+
+```kotlin
+// OpenAI GPT-4o
+val gpt = GPTClient.openai(apiKey = System.getenv("OPENAI_API_KEY"))
+
+// Anthropic Claude — no API key needed for Ollama
+val local = GPTClient.ollama(model = "llama3")
+
+// Interpret DNA with ML context
+val resp = gpt.interpretDNA(dna, SequenceMLPredictor.fullAnalysis(dna))
+println(resp.text)
+
+// Interpret drug with full ADMET + ML predictions
+val drugResp = gpt.interpretDrug(aspirin, DrugMLPredictor.fullAnalysis(aspirin))
+println(drugResp.text)
+
+// Extension function style
+val interp = aspirin.interpretWith(gpt)
+
+// Fluent config builder
+val claude = GPTConfig.create {
+    provider  = LLMProvider.ANTHROPIC
+    model     = LLMModels.Anthropic.CLAUDE_35_SONNET
+    apiKey    = System.getenv("ANTHROPIC_API_KEY")
+    maxTokens = 800
+}
+```
+
 ---
 
 ## 📁 Project Structure
@@ -330,7 +391,8 @@ Three documentation formats are included:
 
 | Format | File | Description |
 |---|---|---|
-| **Tutorial** | `BioKt_v2_Tutorial.docx` | 18-chapter tutorial modelled on the BioPython Tutorial and Cookbook. Covers every module with working examples and expected output. |
+| **Tutorial (core)** | `BioKt_v2_Tutorial.docx` | 18-chapter tutorial: sequences, alignment, BLAST, phylogenetics, molecules, descriptors, interactions, and reports. |
+| **Tutorial (ML & GPT)** | `BioKt_v2_Tutorial_ML_GPT.docx` | Chapters 19–20: pretrained ML classifiers, custom model loading, ensemble predictions, GPT/Claude/Gemini/Ollama integration. |
 | **API Docs (Interactive)** | `BioKt_v2_API_Docs.html` | Single-file interactive API reference. Click any module or class in the sidebar to navigate. |
 | **API Docs (Frames)** | `BioKt_v2_API_Docs.zip` | Classic Javadoc-style three-frame documentation: package list · class list · detail view. 65 HTML files. |
 
@@ -349,6 +411,8 @@ This project was built through an extended, iterative collaboration between a hu
 - **Debugging** — systematic resolution of ~80 Kotlin 1.3 compatibility errors caused by a broken `sumOf{}` → `map{}.sum()` regex replacement (the most painful session involved tracking brace-depth mismatches across six files simultaneously)
 - **API documentation** — the 65-file Javadoc-style HTML reference with a 3-frame layout, all 140+ method entries, and syntax-highlighted code examples
 - **Tutorial document** — the 18-chapter, 100+ page BioPython-style tutorial with formatted code blocks, output blocks, and callout boxes, generated as `.docx`
+- **ML inference engine** — `MLPredictor.kt`: 8 pretrained classifiers across 3 domains, 4 algorithm families, custom model JSON loader, ensemble voting
+- **LLM integration layer** — `GPTClient.kt`: multi-provider HTTP client (OpenAI, Anthropic, Google, Ollama), structured biological prompt builders, extension functions
 - **This README**
 
 ### How the collaboration worked
@@ -396,27 +460,73 @@ The scientific models implemented (ADMET rules, empirical binding scores, drug-l
 
 ## 📄 License & Disclaimer
 
-**This project is released into the public domain. No copyright is claimed.**
+### MIT License
 
-You are free to use, copy, modify, share, and build on this code for any purpose — personal, academic, or commercial — without asking for permission and without any conditions.
+```
+MIT License
+
+Copyright (c) 2026 BioKt Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+#### What this means in plain English
+
+**What you CAN do** (no permission needed, no fee, no conditions):
+
+- ✅ Use BioKt in your own projects — personal, academic, or commercial
+- ✅ Copy, modify, and adapt the source code however you like
+- ✅ Distribute it — share it with colleagues, publish it, include it in another library
+- ✅ Sell a product that includes BioKt
+- ✅ Sub-license it under different terms inside your own project
+
+**The one condition:**
+
+- 📎 If you distribute the code or include it in another project, keep the copyright notice and this license text attached. You do not have to credit the author publicly — you just keep the `LICENSE` file in the repository.
+
+**What the author does NOT guarantee:**
+
+- ❌ That the software works correctly for your specific use case
+- ❌ That the scientific results (descriptors, ADMET values, binding scores) are accurate
+- ❌ That the code is free of bugs or errors
+- ❌ Any liability if something goes wrong as a result of using this software
 
 ---
 
-### ⚠️ Important: Use at Your Own Discretion
+### ⚠️ Scientific Accuracy Disclaimer
 
-This library was created as a **demonstration of what AI (Claude by Anthropic) can build**. It is a learning resource and a proof of concept, not a production-grade scientific tool.
+This library was created as a **demonstration of what AI (Claude by Anthropic) can build**. It is a learning resource and a proof of concept — not a validated scientific tool for production or clinical use.
 
-**Please read this before using BioKt in any serious context:**
+**Use at your own discretion. The author is not responsible for the accuracy or inaccuracy of any result produced by this library.**
 
-- The molecular descriptors (LogP, TPSA, MW, etc.) are **estimates** based on simplified atom-contribution models. They are not as accurate as RDKit or Schrödinger.
-- The ADMET predictions (BBB penetration, CYP substrates, hERG risk, oral toxicity, etc.) are **rule-based approximations** derived from published literature heuristics. They are not validated clinical predictions.
-- The drug-protein binding scores are **empirical estimates**, not physics-based docking results. Do not use them to make decisions about real drug candidates.
-- The RNA folding uses a simplified Nussinov algorithm, not the full Turner energy model used by tools like RNAfold.
-- The BLAST implementation is educational-grade and is not a substitute for NCBI BLAST for large-scale searches.
+Specific limitations to be aware of:
 
-**The author takes no responsibility for any outcome — correct or incorrect — that results from using this software.** Whether the results are accurate or inaccurate, helpful or misleading, the decision to use this library and act on its output is entirely yours.
+| Module | Limitation |
+|---|---|
+| `MolDescriptors` — LogP, TPSA, MW | Simplified atom-contribution estimates. Less accurate than RDKit or Schrödinger. |
+| `MolDescriptors` — ADMET profile | Rule-based heuristics from published literature. Not validated clinical predictions. Do not use for drug safety decisions. |
+| `DrugProteinBinding` — binding score | Empirical scoring function, not physics-based docking. Kd estimates are approximate. |
+| `RNAInteraction` — folding | Simplified Nussinov algorithm (max base pairs). Not the full Turner energy model used by RNAfold or Mfold. |
+| `SequenceDatabase` — BLAST | Educational-grade k-mer search. Not suitable as a replacement for NCBI BLAST at genome scale. |
+| `PopGen` — Tajima's D, Fst, dN/dS | Standard implementations, but results should be verified with dedicated tools (e.g. DnaSP, PopGenome) for publication. |
 
-This is a demo. Verify everything with proper scientific tools before drawing conclusions.
+**The right workflow:** Use BioKt for exploration, learning, and rapid prototyping. Confirm any result that matters with a validated, peer-reviewed tool before drawing scientific conclusions or making decisions based on it.
 
 ---
 

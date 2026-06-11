@@ -16,21 +16,33 @@ object ReportGenerator {
     // ── Entry points ─────────────────────────────────────────
 
     fun dnaReport(seq: DNASequence, outputPath: String = "dna_report.html") {
-        val html = buildDNAReport(seq)
+        val dir = java.io.File(outputPath).parent ?: "."
+        val viewerPath = "$dir/dna_viewer.html"
+        java.io.File(viewerPath).writeText(Viewer3D.buildDNAViewer())
+        val html = buildDNAReport(seq, viewerPath = viewerPath)
         java.io.File(outputPath).writeText(html)
         println("DNA report written: $outputPath")
+        println("DNA 3D viewer written: $viewerPath")
     }
 
     fun proteinReport(seq: ProteinSequence, outputPath: String = "protein_report.html") {
-        val html = buildProteinReport(seq)
+        val dir = java.io.File(outputPath).parent ?: "."
+        val viewerPath = "$dir/protein_viewer.html"
+        java.io.File(viewerPath).writeText(Viewer3D.buildProteinViewer())
+        val html = buildProteinReport(seq, viewerPath = viewerPath)
         java.io.File(outputPath).writeText(html)
         println("Protein report written: $outputPath")
+        println("Protein 3D viewer written: $viewerPath")
     }
 
     fun drugReport(mol: Molecule, outputPath: String = "drug_report.html") {
-        val html = buildDrugReport(mol)
+        val dir = java.io.File(outputPath).parent ?: "."
+        val viewerPath = "$dir/molecule_viewer.html"
+        java.io.File(viewerPath).writeText(Viewer3D.buildMoleculeViewer())
+        val html = buildDrugReport(mol, viewerPath = viewerPath)
         java.io.File(outputPath).writeText(html)
         println("Drug report written: $outputPath")
+        println("Molecule 3D viewer written: $viewerPath")
     }
 
     // ── Shared CSS + JS ──────────────────────────────────────
@@ -224,6 +236,27 @@ a { color:var(--blue); }
   .report-header .meta { text-align:left; }
   .summary-grid { grid-template-columns:repeat(2,1fr); }
 }
+
+/* ── 3D Viewer ── */
+.viewer3d-container {
+  background:#0d1117; border-radius:12px; overflow:hidden;
+  border:1px solid #1e3a5f; position:relative; margin-top:8px;
+}
+.viewer3d-container iframe {
+  width:100%; height:400px; border:none; display:block;
+}
+.viewer3d-overlay {
+  position:absolute; top:10px; right:10px; display:flex; gap:8px; z-index:5;
+}
+.viewer3d-btn {
+  background:rgba(31,97,235,.9); color:#fff; border:none; border-radius:16px;
+  padding:6px 14px; font-size:11px; font-weight:700; cursor:pointer;
+  text-decoration:none; backdrop-filter:blur(6px); transition:background .2s;
+}
+.viewer3d-btn:hover { background:#1f6feb; }
+.viewer3d-btn.full { background:rgba(15,118,110,.9); }
+.viewer3d-btn.full:hover { background:#0f766e; }
+
 </style>"""
 
     // ── HTML page wrapper ─────────────────────────────────────
@@ -351,7 +384,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     // DNA REPORT
     // ─────────────────────────────────────────────────────────
 
-    private fun buildDNAReport(seq: DNASequence): String {
+    private fun buildDNAReport(seq: DNASequence, viewerPath: String = ""): String {
         val gc       = seq.gcContent()
         val tm       = seq.meltingTemperature()
         val rc       = seq.reverseComplement().sequence
@@ -391,6 +424,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     ${tocLink("orfs", "Open Reading Frames")}
     ${tocLink("restriction", "Restriction Sites")}
     ${tocLink("translation", "Transcription & Translation")}
+    ${if (viewerPath.isNotEmpty()) tocLink("viewer3d", "3D Structure Viewer") else ""}
     ${tocLink("appendix", "Detailed Appendix")}
   </div>
 </div>"""
@@ -674,7 +708,8 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   </div>
 </div>"""
 
-        val body = header + toc + summary + seqViewer + compSection + structSection +
+        val viewer3d = if (viewerPath.isNotEmpty()) dna3dSection(seq, viewerPath) else ""
+        val body = header + toc + summary + viewer3d + seqViewer + compSection + structSection +
                    orfSection + restrictSection + transSection + appendix
 
         return page("DNA Report — ${seq.id.ifEmpty { "Sequence" }}", body)
@@ -684,7 +719,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     // PROTEIN REPORT
     // ─────────────────────────────────────────────────────────
 
-    private fun buildProteinReport(seq: ProteinSequence): String {
+    private fun buildProteinReport(seq: ProteinSequence, viewerPath: String = ""): String {
         val mw       = seq.molecularWeight()
         val pi       = seq.isoelectricPoint()
         val arom     = seq.aromaticity()
@@ -725,6 +760,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     ${tocLink("prot-physchem", "Physicochemical Properties")}
     ${tocLink("prot-composition", "Amino Acid Composition")}
     ${tocLink("prot-structure", "Structural Prediction")}
+    ${if (viewerPath.isNotEmpty()) tocLink("viewer3d", "3D Structure Viewer") else ""}
     ${tocLink("prot-appendix", "Detailed Appendix")}
   </div>
 </div>"""
@@ -949,7 +985,8 @@ ${run {
   </div>
 </div>"""
 
-        val body = header + toc + summary + seqViewer + physChemSection + compSection + structSection + appendix
+        val viewer3d = if (viewerPath.isNotEmpty()) protein3dSection(seq, viewerPath) else ""
+        val body = header + toc + summary + viewer3d + seqViewer + physChemSection + compSection + structSection + appendix
         return page("Protein Report — ${seq.id.ifEmpty { "Protein" }}", body)
     }
 
@@ -957,7 +994,7 @@ ${run {
     // DRUG / MOLECULE REPORT
     // ─────────────────────────────────────────────────────────
 
-    private fun buildDrugReport(mol: Molecule): String {
+    private fun buildDrugReport(mol: Molecule, viewerPath: String = ""): String {
         val desc    = MolDescriptors.calculate(mol)
         val fp      = Fingerprints.morgan(mol)
         val maccs   = Fingerprints.maccs(mol)
@@ -991,6 +1028,7 @@ ${run {
     ${tocLink("drug-structure", "Structural Analysis")}
     ${tocLink("drug-alerts", "Structural Alerts")}
     ${tocLink("drug-pharm", "Pharmacophore")}
+    ${if (viewerPath.isNotEmpty()) tocLink("viewer3d", "3D Structure Viewer") else ""}
     ${tocLink("drug-appendix", "Detailed Appendix")}
   </div>
 </div>"""
@@ -1251,8 +1289,95 @@ ${run {
   </div>
 </div>"""
 
-        val body = header + toc + summary + descriptorSection + filterSection +
+        val viewer3d = if (viewerPath.isNotEmpty()) molecule3dSection(mol, viewerPath) else ""
+        val body = header + toc + summary + viewer3d + descriptorSection + filterSection +
                    admetSection + structSection + alertsSection + pharmSection + appendix
         return page("Drug Report — ${mol.name.ifEmpty { mol.molecularFormula() }}", body)
     }
+    private fun dna3dSection(seq: DNASequence, viewerPath: String): String {
+        val viewerFile = if (viewerPath.isNotEmpty()) java.io.File(viewerPath).name else "dna_viewer.html"
+        val seqUrl = seq.sequence.take(200)
+        return """
+<div class="section" id="viewer3d">
+  ${sectionTitle("🧬", "3D Structure Viewer")}
+  <div style="margin-bottom:10px;font-size:13px;color:var(--lgray)">
+    Interactive WebGL viewer — drag to rotate, scroll to zoom, touch supported.
+  </div>
+  <div class="viewer3d-container">
+    <iframe src="$viewerFile?seq=$seqUrl" title="DNA 3D Viewer"
+            loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
+    <div class="viewer3d-overlay">
+      <a class="viewer3d-btn full" href="$viewerFile?seq=$seqUrl" target="_blank">⛶ Full Screen</a>
+    </div>
+  </div>
+  <div style="margin-top:10px;font-size:12px;color:var(--lgray)">
+    B-form double helix &middot;
+    A=<span style="color:#f87171">■</span>
+    T=<span style="color:#60a5fa">■</span>
+    G=<span style="color:#4ade80">■</span>
+    C=<span style="color:#facc15">■</span> &middot;
+    Blue/amber backbone &middot; hydrogen bonds shown &middot;
+    Controls: Helix / Base Pairs / Surface
+  </div>
+</div>"""
+    }
+
+
+    private fun protein3dSection(seq: ProteinSequence, viewerPath: String): String {
+        val viewerFile = if (viewerPath.isNotEmpty()) java.io.File(viewerPath).name else "protein_viewer.html"
+        val seqUrl = seq.sequence.take(300)
+        return """
+<div class="section" id="viewer3d">
+  ${sectionTitle("🧬", "3D Structure Viewer")}
+  <div style="margin-bottom:10px;font-size:13px;color:var(--lgray)">
+    Predicted secondary structure in 3D. Ribbon / Ball-chain / Surface modes.
+  </div>
+  <div class="viewer3d-container">
+    <iframe src="$viewerFile?seq=$seqUrl" title="Protein 3D Viewer"
+            loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
+    <div class="viewer3d-overlay">
+      <a class="viewer3d-btn full" href="$viewerFile?seq=$seqUrl" target="_blank">⛶ Full Screen</a>
+    </div>
+  </div>
+  <div style="margin-top:10px;font-size:12px;color:var(--lgray)">
+    α-Helix=<span style="color:#f87171">■</span>
+    β-Sheet=<span style="color:#60a5fa">■</span>
+    Turn=<span style="color:#facc15">■</span>
+    Coil=<span style="color:#4ade80">■</span> &middot;
+    Hydrophobicity coloring available &middot;
+    Chou-Fasman secondary structure prediction
+  </div>
+</div>"""
+    }
+
+
+    private fun molecule3dSection(mol: Molecule, viewerPath: String): String {
+        val viewerFile = if (viewerPath.isNotEmpty()) java.io.File(viewerPath).name else "molecule_viewer.html"
+        val smilesEnc = java.net.URLEncoder.encode(mol.smiles, "UTF-8")
+        val nameEnc   = java.net.URLEncoder.encode(mol.name.ifEmpty { mol.id.ifEmpty { "Molecule" } }, "UTF-8")
+        return """
+<div class="section" id="viewer3d">
+  ${sectionTitle("🧪", "3D Structure Viewer")}
+  <div style="margin-bottom:10px;font-size:13px;color:var(--lgray)">
+    Force-directed 3D embedding from SMILES. Ball-and-stick / Space-fill / Wireframe.
+  </div>
+  <div class="viewer3d-container">
+    <iframe src="$viewerFile?smiles=$smilesEnc&name=$nameEnc" title="Molecule 3D Viewer"
+            loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
+    <div class="viewer3d-overlay">
+      <a class="viewer3d-btn full" href="$viewerFile?smiles=$smilesEnc&name=$nameEnc" target="_blank">⛶ Full Screen</a>
+    </div>
+  </div>
+  <div style="margin-top:10px;font-size:12px;color:var(--lgray)">
+    CPK: C=<span style="color:#94a3b8">■</span>
+    O=<span style="color:#ef4444">■</span>
+    N=<span style="color:#60a5fa">■</span>
+    S=<span style="color:#facc15">■</span>
+    Aromatic=<span style="color:#4ade80">■</span> &middot;
+    300-iteration force-directed layout
+  </div>
+</div>"""
+    }
+
+
 }
