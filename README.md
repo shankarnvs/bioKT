@@ -67,9 +67,10 @@ val score  = DrugProteinBinding.score(drug, prot)       // –5.46 kcal/mol
 | **ML Prediction** | Pretrained classifiers: coding/non-coding DNA, promoter, splice site, enzyme, membrane, drug activity, toxicity (Cramer I/II/III), hERG risk |
 | **Custom Models** | Load any scikit-learn / R / Weka model from JSON weight files — Naive Bayes, kNN, Decision Tree, Random Forest, Logistic Regression |
 | **LLM Integration** | OpenAI GPT-4o, Anthropic Claude, Google Gemini, Ollama (local) — biological interpretation of sequences, proteins, and drug molecules |
+| **Rice Genomics** | `biokt.rice` subpackage — VCF parsing, GFF3 annotation, SSR detection, cis-element scanning, TE classification, R-gene patterns, expression normalisation (TPM/FPKM/DESeq2), DE analysis, haplotype blocks, selection sweeps |
 | **Metal-Ligand** | Metal detection, coordination scoring, metal-binding residue prediction |
 
-**Stats:** 19 source files · 6,138 lines · 66 classes/objects · 177 public functions · 39/39 tests passing
+**Stats:** 25 source files · 9,108 lines · 86 classes/objects · 253 public functions · 39/39 tests passing
 
 ---
 
@@ -119,6 +120,13 @@ biokt/
 ├── ReportGenerator.kt   # HTML report generation with embedded 3D viewers
 ├── Viewer3D.kt          # Three.js 3D viewers (DNA helix, protein, molecule)
 ├── TestRunner.kt        # Self-contained 39-test suite (no JUnit needed)
+└── rice/                # Rice genomics subpackage (import biokt.rice.*)
+    ├── RicePackage.kt       # Package entry point, Rice constants, extension functions
+    ├── RiceVariants.kt      # VCF/BCF parsing, SNP/INDEL, LD, genotype matrix
+    ├── GenomeAnnotation.kt  # GFF3/GTF, gene models, RAP-DB/MSU IDs
+    ├── RiceGenomics.kt      # SSR, cis-elements (30), TEs, R-genes, flowering genes, chromosomes
+    ├── RiceExpression.kt    # TPM/FPKM/DESeq2, DE (Welch+BH), co-expression, stress gene sets
+    └── HaplotypeAnalysis.kt # Gabriel blocks, windowed pi/θ_W/Tajima's D, selection sweeps
 └── Main.kt              # Demo entry point
 ```
 
@@ -228,6 +236,52 @@ println(result.isLikelyBinder)  // true
 result.interactions.forEach { i ->
     println("[${i.type}] ${i.strength} kcal/mol — ${i.description}")
 }
+```
+
+### Rice genomics (biokt.rice subpackage)
+
+```kotlin
+import biokt.*
+import biokt.rice.*
+
+// Parse a VCF file — SNPs only, MAF ≥ 5%, chr01
+val vcf = VcfParser.parse("3krg.vcf", snpsOnly=true, minMaf=0.05, regionChrom="chr01")
+println(vcf.summarise().print())
+
+// Parse a GFF3 annotation
+val db = AnnotationParser.parseGff3("IRGSP-1.0.gff3")
+val hd1 = db.getByRapId("Os06g0275000")       // Heading date 1
+println(hd1?.summary())
+
+// SSR detection in a promoter
+val ssrs = myPromoterSeq.detectSSRs()
+println("${ssrs.size} SSRs found")
+
+// Scan for cis-elements (W-box, ABRE, DRE/CRT, etc.)
+val elements = myPromoterSeq.scanRicePromoter()
+println("W-box count: ${elements["W-box"]}")
+
+// Check if protein is an R-gene (NBS-LRR, RLK, etc.)
+val (isR, evidence) = myProtein.isRGene()
+println("Is R-gene: $isR")
+
+// Differential expression — drought vs control
+val de = DifferentialExpression.analyse(log2matrix, droughtSamples, ctrlSamples)
+val degs = de.filter { it.isSignificant }
+val enrichment = RiceStressGeneSets.enrichment(degs.map { it.geneId })
+
+// Haplotype blocks and diversity
+val blocks  = HaplotypeBlocks.defineBlocks(vcf, "chr06")
+val windows = WindowedDiversity.compute(vcf, "chr06", windowSize=100_000)
+val sweeps  = WindowedDiversity.selectionWindows(windows)
+
+// Selection sweeps between Indica and Japonica
+val scores = SelectionSweepDetector.detect(indica, japonica, "chr04")
+SelectionSweepDetector.topSweeps(scores, 10).forEach { println(it) }
+
+// Flowering gene catalogue
+FloweringGenes.getBySymbol("Hd1")?.let { println("${it.symbol}: ${it.function}") }
+println(RiceChromosomes.position("chr06", 2_886_607))  // short arm (p)
 ```
 
 ### ML prediction (pretrained models, no training needed)
@@ -393,6 +447,7 @@ Three documentation formats are included:
 |---|---|---|
 | **Tutorial (core)** | `BioKt_v2_Tutorial.docx` | 18-chapter tutorial: sequences, alignment, BLAST, phylogenetics, molecules, descriptors, interactions, and reports. |
 | **Tutorial (ML & GPT)** | `BioKt_v2_Tutorial_ML_GPT.docx` | Chapters 19–20: pretrained ML classifiers, custom model loading, ensemble predictions, GPT/Claude/Gemini/Ollama integration. |
+| **Tutorial (Rice)** | `BioKt_v2_Tutorial_Rice.docx` | Chapter 21: VCF parsing, GFF3 annotation, SSR/cis-elements, expression analysis, haplotype blocks, selection sweeps. Appendix E: reference tables. |
 | **API Docs (Interactive)** | `BioKt_v2_API_Docs.html` | Single-file interactive API reference. Click any module or class in the sidebar to navigate. |
 | **API Docs (Frames)** | `BioKt_v2_API_Docs.zip` | Classic Javadoc-style three-frame documentation: package list · class list · detail view. 65 HTML files. |
 
@@ -411,6 +466,7 @@ This project was built through an extended, iterative collaboration between a hu
 - **Debugging** — systematic resolution of ~80 Kotlin 1.3 compatibility errors caused by a broken `sumOf{}` → `map{}.sum()` regex replacement (the most painful session involved tracking brace-depth mismatches across six files simultaneously)
 - **API documentation** — the 65-file Javadoc-style HTML reference with a 3-frame layout, all 140+ method entries, and syntax-highlighted code examples
 - **Tutorial document** — the 18-chapter, 100+ page BioPython-style tutorial with formatted code blocks, output blocks, and callout boxes, generated as `.docx`
+- **Rice genomics subpackage** — `biokt.rice/`: 6 files, 2,970 lines covering VCF parsing, GFF3 annotation, SSR detection, 30 cis-elements, TE classification, R-gene patterns, 18 flowering genes, 6 stress gene sets, DESeq2 normalisation, Welch DE analysis, Gabriel haplotype blocks, windowed Tajima's D, and cross-population selection sweep scoring
 - **ML inference engine** — `MLPredictor.kt`: 8 pretrained classifiers across 3 domains, 4 algorithm families, custom model JSON loader, ensemble voting
 - **LLM integration layer** — `GPTClient.kt`: multi-provider HTTP client (OpenAI, Anthropic, Google, Ollama), structured biological prompt builders, extension functions
 - **This README**
