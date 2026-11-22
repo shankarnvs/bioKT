@@ -10,10 +10,20 @@ repositories {
     mavenCentral()
 }
 
+val jmh by sourceSets.creating {
+    val main = sourceSets.main.get()
+    compileClasspath += main.output
+    runtimeClasspath += main.output
+}
+
+configurations[jmh.implementationConfigurationName].extendsFrom(configurations.implementation.get())
+
 dependencies {
     implementation(kotlin("stdlib"))
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    add(jmh.implementationConfigurationName, "org.openjdk.jmh:jmh-core:1.37")
+    add(jmh.annotationProcessorConfigurationName, "org.openjdk.jmh:jmh-generator-annprocess:1.37")
 }
 
 kotlin {
@@ -38,6 +48,14 @@ sourceSets.main {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.register<JavaExec>("jmh") {
+    group = "verification"
+    description = "Run the JVM performance benchmarks"
+    classpath = jmh.runtimeClasspath
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(17)) })
+    mainClass.set("org.openjdk.jmh.Main")
 }
 
 application {
