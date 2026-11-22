@@ -252,6 +252,15 @@ val db = AnnotationParser.parseGff3("IRGSP-1.0.gff3")
 val hd1 = db.getByRapId("Os06g0275000")       // Heading date 1
 println(hd1?.summary())
 
+// Resolve coding SNPs with the matching genomic reference FASTA
+val reference = SeqIO.parse("IRGSP-1.0.fa", "fasta")
+    .associate { it.id to it.sequence.sequence }
+val annotations = AnnotationOverlap.annotateVariants(vcf, db, reference)
+for (effect in annotations.flatMap { it.codingSnpEffects }) {
+    println("${effect.consequence}: ${effect.referenceAminoAcid}" +
+        "${effect.aminoAcidPosition ?: "?"}${effect.alternateAminoAcid}")
+}
+
 // SSR detection in a promoter
 val ssrs = myPromoterSeq.detectSSRs()
 println("${ssrs.size} SSRs found")
@@ -282,6 +291,13 @@ SelectionSweepDetector.topSweeps(scores, 10).forEach { println(it) }
 FloweringGenes.getBySymbol("Hd1")?.let { println("${it.symbol}: ${it.function}") }
 println(RiceChromosomes.position("chr06", 2_886_607))  // short arm (p)
 ```
+
+Reference FASTA IDs must match the VCF and GFF3 contig names. Coding SNP
+effects are reported per alternate allele for the primary transcript using
+the standard nuclear genetic code. BioKt uses CDS phase and strand to
+reconstruct the codon. With insufficient reference or phase information, the
+coding SNP retains the generic label. Amino acid positions are 1-based and
+are omitted when the first CDS phase indicates a partial initial codon.
 
 ### ML prediction with built-in classifiers
 
