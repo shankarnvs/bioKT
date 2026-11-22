@@ -471,7 +471,9 @@ object AnnotationOverlap {
     /** Annotate VCF records against a gene annotation database */
     fun annotateVariants(vcf: VcfFile, db: AnnotationDb): List<VariantAnnotation> {
         return vcf.records.flatMap { rec ->
-            val overlapping = db.genesInRegion(rec.chrom, rec.pos, rec.pos)
+            val deletion = deletedBases(rec)
+            val affected = deletion ?: rec.pos..rec.pos
+            val overlapping = db.genesInRegion(rec.chrom, affected.first, affected.last)
             if (overlapping.isEmpty()) {
                 // Check 2 kb upstream/downstream
                 val nearest = db.nearestGene(rec.chrom, rec.pos)
@@ -487,20 +489,34 @@ object AnnotationOverlap {
                 } else emptyList()
             } else {
                 overlapping.map { gene ->
-                    val ftype = determineFeatureType(rec, gene)
-                    val csq = estimateConsequence(rec, ftype, gene.primaryTranscript)
+                    val transcript = gene.primaryTranscript
+                    val ftype = determineFeatureType(affected, transcript)
+                    val csq = estimateConsequence(rec, ftype, transcript, affected, deletion)
                     VariantAnnotation(rec, gene.id, gene.gene.attr("Name"), ftype, csq)
                 }
             }
         }
     }
 
-    private fun determineFeatureType(rec: VcfRecord, gene: GeneModel): String {
-        val tx = gene.primaryTranscript ?: return "intron"
+    private fun deletedBases(rec: VcfRecord): IntRange? {
+        val alt = rec.alt.singleOrNull() ?: return null
+        if (!alt.matches(Regex("[ACGTN]+", RegexOption.IGNORE_CASE)) || alt.length >= rec.ref.length) {
+            return null
+        }
+        val prefix = rec.ref.commonPrefixWith(alt, ignoreCase = true).length
+        val suffix = rec.ref.drop(prefix).commonSuffixWith(alt.drop(prefix), ignoreCase = true).length
+        if (prefix + suffix != alt.length) return null
+        return (rec.pos + prefix)..(rec.pos + rec.ref.lastIndex - suffix)
+    }
+
+    private fun determineFeatureType(affected: IntRange, tx: TranscriptModel?): String {
+        if (tx == null) return "intron"
+        fun overlaps(feature: GffFeature) =
+            feature.start <= affected.last && feature.end >= affected.first
         return when {
-            tx.cdss.any { rec.pos in it.start..it.end } -> "CDS"
-            tx.exons.any { rec.pos in it.start..it.end } -> "exon"
-            tx.utrs.any  { rec.pos in it.start..it.end } -> "UTR"
+            tx.cdss.any(::overlaps) -> "CDS"
+            tx.utrs.any(::overlaps) -> "UTR"
+            tx.exons.any(::overlaps) -> "exon"
             else -> "intron"
         }
     }
@@ -508,13 +524,17 @@ object AnnotationOverlap {
     private fun estimateConsequence(
         rec: VcfRecord,
         featureType: String,
-        transcript: TranscriptModel?
+        transcript: TranscriptModel?,
+        affected: IntRange,
+        deletion: IntRange?
     ): String {
-        if (featureType == "intron" && transcript != null && isNearSpliceSite(rec, transcript)) {
+        if (featureType == "intron" && transcript != null && isNearSpliceSite(affected, transcript)) {
             return "splice_region"
         }
         if (!rec.isSNP) return when (featureType) {
-            "CDS"   -> codingConsequence(rec)
+            "CDS"   -> if (deletion != null && transcript != null) {
+                indelConsequence(deletedCodingBaseCount(deletion, transcript))
+            } else codingConsequence(rec)
             "exon"  -> "exon_indel"
             else    -> "indel"
         }
@@ -534,20 +554,36 @@ object AnnotationOverlap {
             when {
                 !allele.matches(Regex("[ACGTN]+", RegexOption.IGNORE_CASE)) -> "coding_variant"
                 allele.length == rec.ref.length -> "coding_variant"
-                (allele.length - rec.ref.length) % 3 == 0 -> "inframe_indel"
-                else -> "frameshift"
+                else -> indelConsequence(allele.length - rec.ref.length)
             }
         }.distinct()
         return consequences.singleOrNull() ?: "coding_variant"
     }
 
-    private fun isNearSpliceSite(rec: VcfRecord, transcript: TranscriptModel): Boolean {
-        val position = rec.pos.toLong()
+    private fun indelConsequence(lengthChange: Int): String =
+        if (lengthChange % 3 == 0) "inframe_indel" else "frameshift"
+
+    private fun deletedCodingBaseCount(deletion: IntRange, transcript: TranscriptModel): Int {
+        var coveredThrough = deletion.first - 1
+        var count = 0
+        for (cds in transcript.cdss.sortedBy { it.start }) {
+            val start = maxOf(deletion.first, cds.start, coveredThrough + 1)
+            val end = minOf(deletion.last, cds.end)
+            if (start <= end) {
+                count += end - start + 1
+                coveredThrough = end
+            }
+        }
+        return count
+    }
+
+    private fun isNearSpliceSite(affected: IntRange, transcript: TranscriptModel): Boolean {
         return transcript.exons.sortedBy { it.start }.zipWithNext().any { (left, right) ->
             val intronStart = left.end.toLong() + 1
             val intronEnd = right.start.toLong() - 1
-            position in intronStart..intronEnd &&
-                minOf(position - intronStart, intronEnd - position) < 2
+            val first = maxOf(affected.first.toLong(), intronStart)
+            val last = minOf(affected.last.toLong(), intronEnd)
+            first <= last && (first - intronStart < 2 || intronEnd - last < 2)
         }
     }
 }

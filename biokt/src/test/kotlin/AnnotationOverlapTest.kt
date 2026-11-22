@@ -9,7 +9,8 @@ class AnnotationOverlapTest {
         chr1 test gene 100 240 . + . ID=gene1
         chr1 test mRNA 100 240 . + . ID=tx1;Parent=gene1
         chr1 test exon 110 130 . + . Parent=tx1
-        chr1 test CDS 110 130 . + 0 Parent=tx1
+        chr1 test five_prime_UTR 110 114 . + . Parent=tx1
+        chr1 test CDS 115 130 . + 0 Parent=tx1
         chr1 test exon 200 230 . + . Parent=tx1
         """.trimIndent().replace(' ', '\t')
     )
@@ -22,6 +23,13 @@ class AnnotationOverlapTest {
         assertEquals("coding_variant", consequence(115, "AT", "CG"))
         assertEquals("coding_variant", consequence(115, "A", "<DEL>"))
         assertEquals("coding_variant", consequence(115, "A", "AT,ATCG"))
+    }
+
+    @Test
+    fun prioritizesUtrAndCountsOnlyDeletedCodingBases() {
+        assertEquals("UTR_SNP", consequence(112, "A", "G"))
+        assertEquals("frameshift", consequence(114, "AC", "A"))
+        assertEquals("frameshift", consequence(112, "ATGC", "A"))
     }
 
     @Test

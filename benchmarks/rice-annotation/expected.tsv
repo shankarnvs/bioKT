@@ -1,0 +1,8 @@
+case_id	gene_id	expected
+utr_snp	g	UTR_SNP
+utr_anchored_coding_deletion	g	frameshift
+inframe_insertion	g	inframe_indel
+coding_frameshift	g	frameshift
+left_splice_boundary	g	splice_region
+internal_intron	g	intronic
+right_splice_boundary	g	splice_region

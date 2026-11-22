@@ -1,0 +1,7 @@
+##gff-version 3
+chr1	benchmark	gene	100	240	.	+	.	ID=g
+chr1	benchmark	mRNA	100	240	.	+	.	ID=t;Parent=g
+chr1	benchmark	exon	110	130	.	+	.	Parent=t
+chr1	benchmark	five_prime_UTR	110	114	.	+	.	Parent=t
+chr1	benchmark	CDS	115	130	.	+	0	Parent=t
+chr1	benchmark	exon	200	230	.	+	.	Parent=t
