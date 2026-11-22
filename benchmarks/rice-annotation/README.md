@@ -19,4 +19,7 @@ The baseline at commit `9e1124a` has five matches and two mismatches. The 5′ U
 SNP receives a generic exon label, and the deletion anchored at position 114
 receives an exon-indel label even though it removes the first coding base at
 position 115. The expected labels record the intended behavior so both cases
-serve as regression checks. With both fixes applied, all seven cases should pass.
+serve as regression checks. The expanded fixture adds a reverse-strand
+transcript, an exon-anchored intronic deletion, and multiallelic records.
+BioKt reports one label per record and gene. Where alternate alleles imply
+different coding effects, the expected aggregate label is `coding_variant`.

@@ -418,6 +418,12 @@ viewModelScope.launch(Dispatchers.Default) {
 Run the JUnit suite with `sh ./gradlew test` (`gradlew.bat test` on Windows).
 The demo also runs 39 standalone checks and exits with an error if a check fails.
 
+GitHub Actions runs the build, both test suites, and the rice annotation
+correctness benchmark on pushes and pull requests. The workflow publishes the
+JUnit reports and benchmark TSV as artifacts. See the
+[rice benchmark instructions](benchmarks/rice-annotation/README.md) for the
+fixtures and local reproduction commands.
+
 ```bash
 sh ./gradlew run
 # ...
