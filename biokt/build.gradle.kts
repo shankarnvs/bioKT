@@ -58,6 +58,22 @@ tasks.register<JavaExec>("jmh") {
     mainClass.set("org.openjdk.jmh.Main")
 }
 
+tasks.register<JavaExec>("molecularBindingCheck") {
+    group = "verification"
+    description = "Compare the albumin pilot scores with the published binding measurements"
+    classpath = jmh.runtimeClasspath
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(17)) })
+    mainClass.set("biokt.benchmark.AlbuminBindingBenchmark")
+}
+
+tasks.register<JavaExec>("interactionChecks") {
+    group = "verification"
+    description = "Run the interaction benchmark fixture checks"
+    classpath = jmh.runtimeClasspath
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(17)) })
+    mainClass.set("biokt.benchmark.InteractionBenchmarks")
+}
+
 application {
     mainClass.set("biokt.MainKt")
 }

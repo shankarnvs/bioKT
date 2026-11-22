@@ -20,7 +20,7 @@ val gene   = DNASequence("ATGGCCATTGTAATGGGCCGCTGA")
 val prot   = gene.translate()                            // MAIVMGR
 val drug   = Molecule("CC(=O)Oc1ccccc1C(=O)O", name="Aspirin")
 val desc   = MolDescriptors.calculate(drug)             // MW, LogP, ADMET…
-val score  = DrugProteinBinding.score(drug, prot)       // –5.46 kcal/mol
+val score  = DrugProteinBinding.score(drug, prot)       // heuristic ranking result
 ```
 
 ---
@@ -228,14 +228,30 @@ targets.forEach { println("pos=${it.seedMatchPosition}  type=${it.siteType}") }
 
 ```kotlin
 val result = DrugProteinBinding.score(drug, proteinSeq)
-println(result.bindingScore)    // –5.46 kcal/mol
+println(result.bindingScore)    // lower suggests stronger binding
 println(result.estimatedKd)     // 141.9 µM
 println(result.isLikelyBinder)  // true
 
 result.interactions.forEach { i ->
-    println("[${i.type}] ${i.strength} kcal/mol — ${i.description}")
+    println("[${i.type}] score contribution ${i.strength} — ${i.description}")
 }
 ```
+
+For a Kd estimate in micromolar, fit a calibration with measured affinities
+from a comparable assay on the same protein sequence. Supply separate
+measurements to evaluate the fitted model.
+
+```kotlin
+val calibration = DrugProteinBinding.fitAffinityCalibration(proteinSeq, measuredAffinities)
+val prediction = DrugProteinBinding.score(drug, proteinSeq, calibration)
+println(prediction.kdMicromolar)
+println(prediction.isExtrapolation)
+```
+
+Construct each calibration input as a `DrugProteinBinding.MeasuredAffinity` with
+the molecule and measured Kd in micromolar. Two distinct scores are sufficient
+to fit the curve, while a larger panel is needed to evaluate it. The original
+two-argument method exposes its historical `estimatedKd` as an uncalibrated proxy.
 
 ### Rice genomics (biokt.rice subpackage)
 
@@ -439,6 +455,9 @@ correctness benchmark on pushes and pull requests. The workflow publishes the
 JUnit reports and benchmark TSV as artifacts. See the
 [rice benchmark instructions](benchmarks/rice-annotation/README.md) for the
 fixtures and local reproduction commands.
+
+The [JVM performance benchmarks](benchmarks/performance/README.md) measure VCF
+parsing and annotation separately with JMH.
 
 ```bash
 sh ./gradlew run
