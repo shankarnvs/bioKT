@@ -151,4 +151,5 @@ fun runTests() {
     println("Results: $passed passed, $failed failed out of ${passed+failed} tests")
     if (failures.isNotEmpty()) { println("\nFailures:"); failures.forEach { println("  - $it") } }
     println("==============================\n")
+    check(failed == 0) { "$failed standalone tests failed" }
 }

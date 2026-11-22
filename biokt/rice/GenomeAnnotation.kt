@@ -488,7 +488,7 @@ object AnnotationOverlap {
             } else {
                 overlapping.map { gene ->
                     val ftype = determineFeatureType(rec, gene)
-                    val csq   = estimateConsequence(rec, ftype)
+                    val csq = estimateConsequence(rec, ftype, gene.primaryTranscript)
                     VariantAnnotation(rec, gene.id, gene.gene.attr("Name"), ftype, csq)
                 }
             }
@@ -505,9 +505,16 @@ object AnnotationOverlap {
         }
     }
 
-    private fun estimateConsequence(rec: VcfRecord, featureType: String): String {
+    private fun estimateConsequence(
+        rec: VcfRecord,
+        featureType: String,
+        transcript: TranscriptModel?
+    ): String {
+        if (featureType == "intron" && transcript != null && isNearSpliceSite(rec, transcript)) {
+            return "splice_region"
+        }
         if (!rec.isSNP) return when (featureType) {
-            "CDS"   -> "frameshift"
+            "CDS"   -> codingConsequence(rec)
             "exon"  -> "exon_indel"
             else    -> "indel"
         }
@@ -515,16 +522,32 @@ object AnnotationOverlap {
             "CDS"        -> "missense_or_synonymous"   // would need codon context for exact class
             "exon"       -> "exon_SNP"
             "UTR"        -> "UTR_SNP"
-            "intron"     -> if (isNearSpliceSite(rec)) "splice_region" else "intronic"
+            "intron"     -> "intronic"
             "upstream"   -> "upstream_variant"
             "downstream" -> "downstream_variant"
             else         -> "unknown"
         }
     }
 
-    private fun isNearSpliceSite(rec: VcfRecord): Boolean {
-        // Canonical splice site positions ±2 bp from exon boundary
-        // Without exon coords here we use a proxy: intronic variants close to round numbers
-        return false  // placeholder — full implementation requires exon coords
+    private fun codingConsequence(rec: VcfRecord): String {
+        val consequences = rec.alt.map { allele ->
+            when {
+                !allele.matches(Regex("[ACGTN]+", RegexOption.IGNORE_CASE)) -> "coding_variant"
+                allele.length == rec.ref.length -> "coding_variant"
+                (allele.length - rec.ref.length) % 3 == 0 -> "inframe_indel"
+                else -> "frameshift"
+            }
+        }.distinct()
+        return consequences.singleOrNull() ?: "coding_variant"
+    }
+
+    private fun isNearSpliceSite(rec: VcfRecord, transcript: TranscriptModel): Boolean {
+        val position = rec.pos.toLong()
+        return transcript.exons.sortedBy { it.start }.zipWithNext().any { (left, right) ->
+            val intronStart = left.end.toLong() + 1
+            val intronEnd = right.start.toLong() - 1
+            position in intronStart..intronEnd &&
+                minOf(position - intronStart, intronEnd - position) < 2
+        }
     }
 }

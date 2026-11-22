@@ -64,13 +64,12 @@ val score  = DrugProteinBinding.score(drug, prot)       // –5.46 kcal/mol
 | **Drug-DNA** | Intercalation scoring, minor groove binding, covalent risk profiling |
 | **Drug-Protein** | Empirical binding score, pharmacophore generation & matching, linear QSAR |
 | **CRISPR** | SpCas9 guide efficiency, R-loop propensity, transcription bubble stability |
-| **ML Prediction** | Pretrained classifiers: coding/non-coding DNA, promoter, splice site, enzyme, membrane, drug activity, toxicity (Cramer I/II/III), hERG risk |
+| **ML Prediction** | Built-in rule-based classifiers with literature-derived parameters for sequence, protein, and molecule properties |
 | **Custom Models** | Load any scikit-learn / R / Weka model from JSON weight files — Naive Bayes, kNN, Decision Tree, Random Forest, Logistic Regression |
 | **LLM Integration** | OpenAI GPT-4o, Anthropic Claude, Google Gemini, Ollama (local) — biological interpretation of sequences, proteins, and drug molecules |
 | **Rice Genomics** | `biokt.rice` subpackage — VCF parsing, GFF3 annotation, SSR detection, cis-element scanning, TE classification, R-gene patterns, expression normalisation (TPM/FPKM/DESeq2), DE analysis, haplotype blocks, selection sweeps |
 | **Metal-Ligand** | Metal detection, coordination scoring, metal-binding residue prediction |
 
-**Stats:** 25 source files · 9,108 lines · 86 classes/objects · 253 public functions · 39/39 tests passing
 
 ---
 
@@ -95,7 +94,7 @@ dependencies {
 
 ### Option 3 — Use the source directly (recommended for Android)
 
-Copy all `.kt` files from `src/main/kotlin/biokt/` into your source set. No Maven dependencies needed — only the Kotlin stdlib is required.
+Copy the production Kotlin files from `biokt/` and `biokt/rice/` into your source set. Include the three `*_viewer.html` files as classpath resources if you use report generation.
 
 ---
 
@@ -115,7 +114,7 @@ biokt/
 ├── ProteinDescriptors.kt# ProteinDescriptors (AAC, DPC, CTD, QSO, PAAC, …)
 ├── SequenceInteraction.kt # ProteinInteraction, DNAInteraction, RNAInteraction, DNARNAInteraction
 ├── MoleculeInteraction.kt # DrugProteinBinding, DrugDNABinding, DrugRNABinding, MetalLigandBinding
-├── MLPredictor.kt       # Pretrained ML classifiers (NaiveBayes, kNN, RF, DT, Linear)
+├── MLPredictor.kt       # Built-in classifiers and custom model loading
 ├── GPTClient.kt         # Multi-provider LLM client (OpenAI, Anthropic, Google, Ollama)
 ├── ReportGenerator.kt   # HTML report generation with embedded 3D viewers
 ├── Viewer3D.kt          # Three.js 3D viewers (DNA helix, protein, molecule)
@@ -284,7 +283,7 @@ FloweringGenes.getBySymbol("Hd1")?.let { println("${it.symbol}: ${it.function}")
 println(RiceChromosomes.position("chr06", 2_886_607))  // short arm (p)
 ```
 
-### ML prediction (pretrained models, no training needed)
+### ML prediction with built-in classifiers
 
 ```kotlin
 // DNA — coding, promoter, splice site
@@ -343,12 +342,17 @@ val claude = GPTConfig.create {
 ## 📁 Project Structure
 
 ```
-biokt/
-├── src/main/kotlin/biokt/    # All 14 source files
-├── biokt2.jar                # Pre-built runnable JAR (includes Kotlin stdlib)
-├── build.gradle.kts          # Gradle build file
-├── settings.gradle.kts
-└── README.md
+bioKT/
+├── README.md
+└── biokt/
+    ├── *.kt                  # Core sources and BioKtTest.kt
+    ├── rice/                 # Rice genomics sources
+    ├── src/test/kotlin/      # Additional JUnit tests
+    ├── *_viewer.html         # Report viewer resources
+    ├── biokt2.jar            # Previously built demo JAR
+    ├── build.gradle.kts
+    ├── settings.gradle.kts
+    └── gradlew, gradlew.bat
 ```
 
 ---
@@ -358,31 +362,26 @@ biokt/
 ### With Gradle (recommended)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/biokt.git
-cd biokt
-./gradlew jar
-java -jar build/libs/biokt-2.0.jar
+git clone https://github.com/shankarnvs/bioKT.git
+cd bioKT/biokt
+sh ./gradlew test installDist
+sh ./build/install/biokt/bin/biokt
 ```
 
-### With kotlinc directly
-
-```bash
-kotlinc src/main/kotlin/biokt/*.kt -include-runtime -d biokt2.jar
-java -jar biokt2.jar
-```
+On Windows, use `gradlew.bat test installDist` and
+`build\install\biokt\bin\biokt.bat`. The installed distribution includes the
+runtime dependencies. The library JAR is `build/libs/biokt-2.0.0.jar`.
 
 ### Requirements
 
-- Kotlin 1.3 or later (Kotlin 1.9+ recommended)
-- Java 8 or later
-
-> **Kotlin version note:** The source uses Kotlin 1.3-compatible idioms (`.map{}.sum()` instead of `.sumOf{}`, etc.) so it builds in older environments. On Kotlin 1.9+, you can modernise these without any functional change.
+- JDK 17
+- The Gradle wrapper pins Gradle 8.10.2. The build uses Kotlin 1.9.22.
 
 ---
 
 ## 📱 Android Integration
 
-Drop all `.kt` files from `src/main/kotlin/biokt/` into your Android project's source set — **no Gradle dependencies beyond the Kotlin stdlib are needed**.
+Copy the production Kotlin files from `biokt/` and `biokt/rice/` into your Android project's source set. Include the viewer resources if you use report generation.
 
 ```kotlin
 // build.gradle.kts (app)
@@ -416,10 +415,11 @@ viewModelScope.launch(Dispatchers.Default) {
 
 ## 🧪 Testing
 
-BioKt ships with 39 self-contained tests. No JUnit or testing framework is required.
+Run the JUnit suite with `sh ./gradlew test` (`gradlew.bat test` on Windows).
+The demo also runs 39 standalone checks and exits with an error if a check fails.
 
 ```bash
-java -jar biokt2.jar
+sh ./gradlew run
 # ...
 # Results: 39 passed, 0 failed out of 39 tests
 ```
@@ -435,7 +435,7 @@ java -jar biokt2.jar
 | Restriction enzymes | 3 |
 | Phylogenetics | 2 |
 | IUPAC codes | 3 |
-| **Total** | **39/39 ✅** |
+| **Total** | **39** |
 
 ---
 
@@ -467,7 +467,7 @@ This project was built through an extended, iterative collaboration between a hu
 - **API documentation** — the 65-file Javadoc-style HTML reference with a 3-frame layout, all 140+ method entries, and syntax-highlighted code examples
 - **Tutorial document** — the 18-chapter, 100+ page BioPython-style tutorial with formatted code blocks, output blocks, and callout boxes, generated as `.docx`
 - **Rice genomics subpackage** — `biokt.rice/`: 6 files, 2,970 lines covering VCF parsing, GFF3 annotation, SSR detection, 30 cis-elements, TE classification, R-gene patterns, 18 flowering genes, 6 stress gene sets, DESeq2 normalisation, Welch DE analysis, Gabriel haplotype blocks, windowed Tajima's D, and cross-population selection sweep scoring
-- **ML inference engine** — `MLPredictor.kt`: 8 pretrained classifiers across 3 domains, 4 algorithm families, custom model JSON loader, ensemble voting
+- **ML inference engine** — `MLPredictor.kt`: built-in classifiers with literature-derived parameters, custom model JSON loader, and ensemble voting
 - **LLM integration layer** — `GPTClient.kt`: multi-provider HTTP client (OpenAI, Anthropic, Google, Ollama), structured biological prompt builders, extension functions
 - **This README**
 
