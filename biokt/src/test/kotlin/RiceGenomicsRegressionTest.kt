@@ -7,6 +7,26 @@ import kotlin.test.assertTrue
 
 class RiceGenomicsRegressionTest {
     @Test
+    fun parsesDiploidCToTTransition() {
+        val fixture = """
+            ##fileformat=VCFv4.2
+            #CHROM POS ID REF ALT QUAL FILTER INFO FORMAT cc ct tt phased missing
+            chr1 10 c_to_t C T 60 PASS . GT 0/0 0/1 1/1 1|0 ./.
+        """.trimIndent().replace(' ', '\t')
+
+        val snp = VcfParser.parseString(fixture).records.single()
+        assertEquals("C", snp.ref)
+        assertEquals(listOf("T"), snp.alt)
+        assertTrue(snp.isTransition)
+        assertEquals(listOf(0, 1, 2, 1, null),
+            listOf("cc", "ct", "tt", "phased", "missing").map { snp.genotypes.getValue(it).dosage() })
+        assertTrue(snp.genotypes.getValue("ct").isHet())
+        assertTrue(snp.genotypes.getValue("phased").isPhased)
+        assertEquals(listOf("1", "0"), snp.genotypes.getValue("phased").alleles())
+        assertEquals(0.5, snp.hetFrequency(), 1e-12)
+    }
+
+    @Test
     fun parsesGenotypesAndFiltersByRegionAndMissingness() {
         val fixture = """
             ##fileformat=VCFv4.2

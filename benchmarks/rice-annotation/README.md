@@ -23,3 +23,18 @@ serve as regression checks. The expanded fixture adds a reverse-strand
 transcript, an exon-anchored intronic deletion, and multiallelic records.
 BioKt reports one label per record and gene. Where alternate alleles imply
 different coding effects, the expected aggregate label is `coding_variant`.
+
+## Diploid C/T genotype correctness
+
+After building the distribution, run this independent synthetic VCF benchmark:
+
+```powershell
+java -cp "biokt/build/install/biokt/lib/*" benchmarks/rice-annotation/DiploidCtBenchmark.java benchmarks/rice-annotation
+```
+
+The fixture contains one biallelic C→T SNP and six synthetic sample calls.
+The driver checks the raw GT, decoded bases, T-allele dosage, phase,
+heterozygosity, and missingness against manually specified expectations.
+It also verifies transition classification and observed heterozygosity
+(three heterozygotes among five called samples). The driver writes sample
+results as TSV and exits nonzero on any failed check.
