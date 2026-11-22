@@ -120,7 +120,8 @@ public class InteractionBenchmarks {
         var terminal = DNAInteraction.INSTANCE.hybridize(fixture.dna, mismatch, 0.05, 250e-9);
         System.out.printf("protein-protein symmetry PASS (score %.6f)%n", forward);
         System.out.printf("perfect duplex PASS (Tm %.3f, mismatches %d)%n", exact.getTm(), exact.getMismatches());
-        System.out.printf("terminal mismatch expected=1 observed=%d; perfect Tm=%.3f mismatch Tm=%.3f%n",
+        require(terminal.getMismatches() == 1 && terminal.getTm() < exact.getTm(), "Terminal duplex mismatch");
+        System.out.printf("terminal mismatch PASS (expected=1 observed=%d); perfect Tm=%.3f mismatch Tm=%.3f%n",
             terminal.getMismatches(), exact.getTm(), terminal.getTm());
         System.out.printf("finite ligand-DNA and ligand-RNA scores PASS (%.6f, %.6f)%n",
             moleculeDna.getDeltaG(), moleculeRna);
