@@ -43,7 +43,7 @@ kotlin {
 
 sourceSets.main {
     resources.srcDir(".")
-    resources.include("*_viewer.html")
+    resources.include("*_viewer.html", "BIOPYTHON-LICENSE", "membrane-model.tsv")
 }
 
 tasks.test {

@@ -268,41 +268,7 @@ class ProteinSequence(
         return sequence.map { weights[it] ?: 0.0 }.sum() - (length - 1) * water
     }
 
-    fun isoelectricPoint(): Double {
-        // Henderson-Hasselbalch approximation
-        val pKa = mapOf(
-            'D' to 3.9, 'E' to 4.1, 'H' to 6.0, 'C' to 8.3,
-            'Y' to 10.1, 'K' to 10.5, 'R' to 12.5
-        )
-        val nTerm = 8.0; val cTerm = 3.1
-        var pH = 7.0
-        val step = 1.0
-        repeat(1000) {
-            // Binary search for charge = 0
-        }
-        // Simplified: return 7.0 as placeholder; production code would iterate
-        var lo = 0.0; var hi = 14.0
-        repeat(100) {
-            val mid = (lo + hi) / 2.0
-            val charge = chargeAtPH(mid, pKa, nTerm, cTerm)
-            if (charge > 0) lo = mid else hi = mid
-        }
-        return (lo + hi) / 2.0
-    }
-
-    private fun chargeAtPH(pH: Double, pKa: Map<Char, Double>, nTerm: Double, cTerm: Double): Double {
-        var charge = 1.0 / (1.0 + Math.pow(10.0, pH - nTerm))  // N-terminus
-        charge -= 1.0 / (1.0 + Math.pow(10.0, cTerm - pH))     // C-terminus
-        for (aa in sequence) {
-            val pk = pKa[aa] ?: continue
-            charge += when (aa) {
-                'D', 'E', 'C', 'Y' -> -1.0 / (1.0 + Math.pow(10.0, pk - pH))
-                'H', 'K', 'R'      ->  1.0 / (1.0 + Math.pow(10.0, pH - pk))
-                else -> 0.0
-            }
-        }
-        return charge
-    }
+    fun isoelectricPoint(): Double = ProteinIonization(sequence, sequence.groupingBy { it }.eachCount()).isoelectricPoint()
 
     fun aminoAcidComposition(): Map<Char, Double> {
         val counts = countAll().filter { it.key != '*' }
@@ -311,7 +277,7 @@ class ProteinSequence(
     }
 
     fun aromaticity(): Double {
-        val aromatic = sequence.count { it in setOf('F', 'H', 'W', 'Y') }
+        val aromatic = sequence.count { it in "FWY" }
         return aromatic.toDouble() / length
     }
 
