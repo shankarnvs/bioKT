@@ -6,9 +6,9 @@
 [![JVM](https://img.shields.io/badge/JVM-8%2B-orange?logo=java)](https://openjdk.org)
 [![Tests](https://img.shields.io/badge/Tests-39%2F39%20passing-brightgreen)](#testing)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey)](#-license--disclaimer)
-[![AI Assisted](https://img.shields.io/badge/Built%20with-Claude%20AI-blueviolet?logo=anthropic)](https://claude.ai)
+[![AI-assisted development](https://img.shields.io/badge/AI%20assistance-Claude%20and%20Codex-blueviolet)](#-ai-collaboration)
 
-> 🤖 **This project was developed with the assistance of [Claude](https://claude.ai) (Anthropic's AI assistant).** The library architecture, all source code, documentation, API reference, and this README were generated through an iterative collaboration between a human developer and Claude. See the [AI Collaboration](#-ai-collaboration) section for details.
+> BioKt began with the goal of running sequence analysis, including homology searches, inside Kotlin Android applications. The developer defined the use case and directed development. Claude generated the initial architecture, code, and documentation. Later revisions used OpenAI Codex for corrections, tests, benchmarks, and membrane classifier development. See [AI Collaboration](#-ai-collaboration).
 
 ---
 
@@ -498,21 +498,21 @@ Open `BioKt_v2_API_Docs.html` directly in any browser — no server needed.
 
 ## 🤖 AI Collaboration
 
-This project was built through an extended, iterative collaboration between a human developer and **[Claude](https://claude.ai)**, Anthropic's AI assistant (Claude Sonnet).
+The developer directed the original implementation with Anthropic Claude and the subsequent audit and evaluation with OpenAI Codex. Reuse of the library in JVM server applications became a second design goal.
 
-### What Claude contributed
+### Original implementation with Claude
 
 - **Library architecture** — module decomposition, class hierarchy, API design decisions
-- **All source code** — all 14 `.kt` files (~4,650 lines), including the SMILES parser, nearest-neighbour thermodynamics, Nussinov RNA folding, Wildman-Crippen LogP, Ertl TPSA, SantaLucia 1998 NN parameters, and empirical ADMET rules
+- **Initial Kotlin implementation** — 14 `.kt` files (~4,650 lines), including the SMILES parser, nearest-neighbour thermodynamics, Nussinov RNA folding, Wildman-Crippen LogP, Ertl TPSA, SantaLucia 1998 NN parameters, and empirical ADMET rules
 - **Debugging** — systematic resolution of ~80 Kotlin 1.3 compatibility errors caused by a broken `sumOf{}` → `map{}.sum()` regex replacement (the most painful session involved tracking brace-depth mismatches across six files simultaneously)
 - **API documentation** — the 65-file Javadoc-style HTML reference with a 3-frame layout, all 140+ method entries, and syntax-highlighted code examples
 - **Tutorial document** — the 18-chapter, 100+ page BioPython-style tutorial with formatted code blocks, output blocks, and callout boxes, generated as `.docx`
 - **Rice genomics subpackage** — `biokt.rice/`: 6 files, 2,970 lines covering VCF parsing, GFF3 annotation, SSR detection, 30 cis-elements, TE classification, R-gene patterns, 18 flowering genes, 6 stress gene sets, DESeq2 normalisation, Welch DE analysis, Gabriel haplotype blocks, windowed Tajima's D, and cross-population selection sweep scoring
 - **ML inference engine** — `MLPredictor.kt`: built-in classifiers with literature-derived parameters, custom model JSON loader, and ensemble voting
 - **LLM integration layer** — `GPTClient.kt`: multi-provider HTTP client (OpenAI, Anthropic, Google, Ollama), structured biological prompt builders, extension functions
-- **This README**
+- **Initial README**
 
-### How the collaboration worked
+### How the original collaboration worked
 
 The session proceeded roughly as:
 
@@ -524,6 +524,10 @@ The session proceeded roughly as:
 6. Human requested Javadoc-style API docs → Claude generated 65 HTML files
 7. Human requested a BioPython-style tutorial → Claude wrote the 18-chapter document
 8. Human requested this README
+
+### Audit and evaluation with OpenAI Codex
+
+The developer selected the workflows and requested comparisons against reference implementations and measured data. Codex assisted with build reproducibility, variant annotation and duplex corrections, regression tests, benchmark implementation and execution, and the pooled vertebrate membrane classifier. The [machine-learning benchmark](benchmarks/ml/README.md) documents the model inputs, training procedure and evaluation split.
 
 ### Disclaimer
 
@@ -608,7 +612,7 @@ SOFTWARE.
 
 ### ⚠️ Scientific Accuracy Disclaimer
 
-This library was created as a **demonstration of what AI (Claude by Anthropic) can build**. It is a learning resource and a proof of concept — not a validated scientific tool for production or clinical use.
+The original release documented an experiment in AI-assisted Kotlin development. Subsequent evaluations cover specific datasets and workflows. The [benchmark scripts](benchmarks/) and [pooled membrane classifier revision](https://github.com/shankarnvs/bioKT/commit/d8111097e9a57256ac0b1d392090cc22c3a89ab4) identify the scope of that evidence.
 
 **Use at your own discretion. The author is not responsible for the accuracy or inaccuracy of any result produced by this library.**
 
@@ -629,7 +633,7 @@ Specific limitations to be aware of:
 
 <div align="center">
 
-**BioKt v2.0** · Built with ❤️ and [Claude AI](https://claude.ai)
+**BioKt** · Developer-directed work with Claude and OpenAI Codex.
 
 *Kotlin bioinformatics for the JVM — from sequences to drug discovery*
 
