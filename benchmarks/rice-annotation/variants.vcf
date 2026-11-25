@@ -1,0 +1,17 @@
+##fileformat=VCFv4.3
+##contig=<ID=chr1,length=240>
+##contig=<ID=chr2,length=240>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr1	112	utr_snp	A	G	.	PASS	.
+chr1	114	utr_anchored_coding_deletion	AC	A	.	PASS	.
+chr1	115	inframe_insertion	C	CTCG	.	PASS	.
+chr1	116	coding_frameshift	AC	A	.	PASS	.
+chr1	131	left_splice_boundary	A	G	.	PASS	.
+chr1	133	internal_intron	A	G	.	PASS	.
+chr1	199	right_splice_boundary	A	G	.	PASS	.
+chr2	130	reverse_intron_deletion	ACGT	A	.	PASS	.
+chr2	131	reverse_left_splice	C	G	.	PASS	.
+chr2	199	reverse_right_splice	A	G	.	PASS	.
+chr2	210	mixed_coding_alleles	A	AT,ATCG	.	PASS	.
+chr2	212	agreeing_coding_alleles	A	ATCG,AGGG	.	PASS	.
+chr2	225	reverse_utr_snp	A	G	.	PASS	.

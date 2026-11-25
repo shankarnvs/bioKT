@@ -1,0 +1,36 @@
+name: BioKt CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build and run JUnit
+        run: ./biokt/gradlew -p biokt --no-daemon test installDist
+      - name: Run standalone checks
+        run: ./biokt/build/install/biokt/bin/biokt
+      - name: Run rice annotation benchmark
+        shell: bash
+        run: |
+          java -cp 'biokt/build/install/biokt/lib/*' \
+            benchmarks/rice-annotation/RiceAnnotationBenchmark.java \
+            benchmarks/rice-annotation | tee biokt/build/rice-results.tsv
+      - name: Upload verification results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: biokt-verification
+          path: |
+            biokt/build/reports/tests/test
+            biokt/build/test-results/test/TEST-*.xml
+            biokt/build/rice-results.tsv

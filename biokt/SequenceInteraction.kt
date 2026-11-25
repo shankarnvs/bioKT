@@ -241,13 +241,13 @@ object DNAInteraction {
         val s2 = seq2.reverseComplement().sequence
         val alignLen = minOf(s1.length, s2.length)
 
-        var dH = 0.0; var dS = 0.0; var mismatches = 0
+        var dH = 0.0; var dS = 0.0
+        val mismatches = (0 until alignLen).count { s1[it] != s2[it] }
 
         for (i in 0 until alignLen - 1) {
             val dinuc = "${s1[i]}${s1[i + 1]}"
             dH += NN_DH[dinuc] ?: -8.0
             dS += NN_DS[dinuc] ?: -21.0
-            if (i < s2.length && s1[i] != s2[i]) mismatches++
         }
 
         // Initiation parameters
@@ -262,7 +262,7 @@ object DNAInteraction {
         val R = 1.987  // cal/mol·K
         val dG37 = dH - (310.15 * (dS / 1000.0))
 
-        // Tm calculation
+        // Approximate concentration adjustment; no mismatch-specific stacking terms.
         val ct = if (mismatches == 0) strandConc else strandConc / 4
         val tm = (dH * 1000.0) / (dS + R * ln(ct)) - 273.15
 

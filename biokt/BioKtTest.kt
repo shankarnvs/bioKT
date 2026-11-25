@@ -52,13 +52,13 @@ class DNASequenceTest {
         // ATG=M, GCC=A, ATT=I, GTA=V, ATG=M, GGC=G, CGC=R, TGA=*
         val dna = DNASequence("ATGGCCATTGTAATGGGCCGCTGA")
         val protein = dna.translate()
-        assertEquals("MAIMMGR", protein.sequence)
+        assertEquals("MAIVMGR", protein.sequence)
     }
 
     @Test fun testTranslateFromStartCodon() {
         val dna = DNASequence("NNNATGGCCATTTGA")
         val protein = dna.translate(startCodon = true)
-        assertEquals("MA", protein.sequence)
+        assertEquals("MAI", protein.sequence)
     }
 
     @Test fun testFindMotif() {
@@ -95,7 +95,7 @@ class RNASequenceTest {
     @Test fun testRNATranslation() {
         val rna = RNASequence("AUGGCCAUUUAA")
         val prot = rna.translate()
-        assertEquals("MA", prot.sequence)
+        assertEquals("MAI", prot.sequence)
     }
 
     @Test fun testRNAInvalidBase() {

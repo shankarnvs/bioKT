@@ -1,0 +1,14 @@
+case_id	gene_id	expected
+utr_snp	g	UTR_SNP
+utr_anchored_coding_deletion	g	frameshift
+inframe_insertion	g	inframe_indel
+coding_frameshift	g	frameshift
+left_splice_boundary	g	splice_region
+internal_intron	g	intronic
+right_splice_boundary	g	splice_region
+reverse_intron_deletion	reverse	splice_region
+reverse_left_splice	reverse	splice_region
+reverse_right_splice	reverse	splice_region
+mixed_coding_alleles	reverse	coding_variant
+agreeing_coding_alleles	reverse	inframe_indel
+reverse_utr_snp	reverse	UTR_SNP

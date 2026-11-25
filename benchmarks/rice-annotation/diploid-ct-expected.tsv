@@ -1,0 +1,7 @@
+sample	GT	bases	t_dosage	phased	heterozygous	missing
+cc	0/0	C/C	0	false	false	false
+ct	0/1	C/T	1	false	true	false
+tt	1/1	T/T	2	false	false	false
+phased_ct	0|1	C|T	1	true	true	false
+phased_tc	1|0	T|C	1	true	true	false
+missing	./.	./.	NA	false	false	true

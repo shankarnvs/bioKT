@@ -80,7 +80,7 @@ data class GeneModel(
     val rapId: String? get() = extractRapId(id) ?: transcripts.mapNotNull { extractRapId(it.mrna.id ?: "") }.firstOrNull()
     val msuId: String? get() = extractMsuId(id) ?: transcripts.mapNotNull { extractMsuId(it.mrna.id ?: "") }.firstOrNull()
 
-    val primaryTranscript: TranscriptModel? get() = transcripts.maxBy { it.cdsLength }
+    val primaryTranscript: TranscriptModel? get() = transcripts.maxByOrNull { it.cdsLength }
 
     /** Upstream promoter region coordinates */
     fun promoterRegion(upstreamBp: Int = 2000, downstreamBp: Int = 200): Triple<String, Int, Int> {
@@ -460,18 +460,44 @@ object RiceGeneIds {
 
 object AnnotationOverlap {
 
-    data class VariantAnnotation(
+    data class CodingSnpEffect(
+        val transcriptId: String,
+        val alternateAllele: String,
+        val consequence: String,
+        val referenceCodon: String,
+        val alternateCodon: String,
+        val aminoAcidPosition: Int?,
+        val referenceAminoAcid: Char,
+        val alternateAminoAcid: Char
+    )
+
+    data class VariantAnnotation @JvmOverloads constructor(
         val record: VcfRecord,
         val geneId: String,
         val geneSymbol: String?,
         val featureType: String,   // CDS, exon, UTR, intron, upstream, downstream
-        val consequence: String    // missense, synonymous, stop_gain, splice, intergenic
+        val consequence: String,
+        val codingSnpEffects: List<CodingSnpEffect> = emptyList()
     )
 
     /** Annotate VCF records against a gene annotation database */
-    fun annotateVariants(vcf: VcfFile, db: AnnotationDb): List<VariantAnnotation> {
+    fun annotateVariants(vcf: VcfFile, db: AnnotationDb): List<VariantAnnotation> =
+        annotateVariants(vcf, db, emptyMap())
+
+    /**
+     * Annotate coding SNPs on the primary transcript using forward-strand reference
+     * sequences keyed by the exact GFF3 and VCF contig names. Each sequence starts
+     * at genomic position 1. Unresolved coding SNPs retain the generic consequence.
+     */
+    fun annotateVariants(
+        vcf: VcfFile,
+        db: AnnotationDb,
+        referenceByContig: Map<String, CharSequence>
+    ): List<VariantAnnotation> {
         return vcf.records.flatMap { rec ->
-            val overlapping = db.genesInRegion(rec.chrom, rec.pos, rec.pos)
+            val deletion = deletedBases(rec)
+            val affected = deletion ?: rec.pos..rec.pos
+            val overlapping = db.genesInRegion(rec.chrom, affected.first, affected.last)
             if (overlapping.isEmpty()) {
                 // Check 2 kb upstream/downstream
                 val nearest = db.nearestGene(rec.chrom, rec.pos)
@@ -487,44 +513,183 @@ object AnnotationOverlap {
                 } else emptyList()
             } else {
                 overlapping.map { gene ->
-                    val ftype = determineFeatureType(rec, gene)
-                    val csq   = estimateConsequence(rec, ftype)
-                    VariantAnnotation(rec, gene.id, gene.gene.attr("Name"), ftype, csq)
+                    val transcript = gene.primaryTranscript
+                    val ftype = determineFeatureType(affected, transcript)
+                    val reference = referenceByContig[rec.chrom]
+                    val effects = if (ftype == "CDS" && transcript != null && reference != null) {
+                        annotateCodingSnp(rec, transcript, reference)
+                    } else emptyList()
+                    val csq = when {
+                        effects.isEmpty() -> estimateConsequence(rec, ftype, transcript, affected, deletion)
+                        effects.size != rec.alt.size -> "coding_variant"
+                        else -> effects.map { it.consequence }.distinct().singleOrNull() ?: "coding_variant"
+                    }
+                    VariantAnnotation(rec, gene.id, gene.gene.attr("Name"), ftype, csq, effects)
                 }
             }
         }
     }
 
-    private fun determineFeatureType(rec: VcfRecord, gene: GeneModel): String {
-        val tx = gene.primaryTranscript ?: return "intron"
+    private fun annotateCodingSnp(
+        record: VcfRecord,
+        transcript: TranscriptModel,
+        reference: CharSequence
+    ): List<CodingSnpEffect> {
+        if (!record.isSNP || transcript.strand !in "+-") return emptyList()
+        if (reference.getOrNull(record.pos - 1)?.uppercaseChar() != record.ref.single().uppercaseChar()) {
+            return emptyList()
+        }
+        val reverse = transcript.strand == '-'
+        val segments = transcript.cdss.sortedBy { if (reverse) -it.end else it.start }
+        val leadingPhase = segments.firstOrNull()?.phase ?: return emptyList()
+        if (leadingPhase !in 0..2) return emptyList()
+        var length = 0
+        var siteOffset = -1
+        for (segment in segments) {
+            // Later CDS phases describe bases that complete the preceding codon.
+            val phase = Math.floorMod(leadingPhase - length, 3)
+            if (segment.phase != phase || segment.seqname != record.chrom ||
+                segment.strand != transcript.strand || segment.start < 1 ||
+                segment.start > segment.end || segment.end > reference.length
+            ) return emptyList()
+            if (record.pos in segment.start..segment.end) {
+                if (siteOffset >= 0) return emptyList()
+                siteOffset = length + if (reverse) segment.end - record.pos else record.pos - segment.start
+            }
+            length += segment.length
+        }
+        if (siteOffset < leadingPhase) return emptyList()
+        val codonOffset = (siteOffset - leadingPhase) % 3
+        val codonStart = siteOffset - codonOffset
+        if (codonStart + 3 > length) return emptyList()
+
+        val codon = StringBuilder(3)
+        var segmentOffset = 0
+        for (segment in segments) {
+            val from = maxOf(0, codonStart - segmentOffset)
+            val endExclusive = minOf(segment.length, codonStart + 3 - segmentOffset)
+            for (offset in from until endExclusive) {
+                val index = if (reverse) segment.end - offset - 1 else segment.start + offset - 1
+                codon.append(codingBase(reference[index], reverse) ?: return emptyList())
+            }
+            if (codon.length == 3) break
+            segmentOffset += segment.length
+        }
+        val referenceCodon = codon.toString()
+        val referenceAminoAcid = CodonTables.STANDARD.translate(referenceCodon)
+        return record.alt.mapNotNull { allele ->
+            val base = codingBase(allele.single(), reverse) ?: return@mapNotNull null
+            if (base == referenceCodon[codonOffset]) return@mapNotNull null
+            val alternateCodon = referenceCodon.replaceRange(codonOffset, codonOffset + 1, base.toString())
+            val alternateAminoAcid = CodonTables.STANDARD.translate(alternateCodon)
+            val consequence = when {
+                referenceAminoAcid == alternateAminoAcid -> "synonymous"
+                alternateAminoAcid == '*' -> "stop_gained"
+                referenceAminoAcid == '*' -> "stop_lost"
+                else -> "missense"
+            }
+            CodingSnpEffect(
+                transcript.id, allele, consequence, referenceCodon, alternateCodon,
+                if (leadingPhase == 0) codonStart / 3 + 1 else null,
+                referenceAminoAcid, alternateAminoAcid
+            )
+        }
+    }
+
+    private fun codingBase(base: Char, reverse: Boolean): Char? = when (base.uppercaseChar()) {
+        'A' -> if (reverse) 'T' else 'A'
+        'C' -> if (reverse) 'G' else 'C'
+        'G' -> if (reverse) 'C' else 'G'
+        'T' -> if (reverse) 'A' else 'T'
+        else -> null
+    }
+
+    private fun deletedBases(rec: VcfRecord): IntRange? {
+        val alt = rec.alt.singleOrNull() ?: return null
+        if (!alt.matches(Regex("[ACGTN]+", RegexOption.IGNORE_CASE)) || alt.length >= rec.ref.length) {
+            return null
+        }
+        val prefix = rec.ref.commonPrefixWith(alt, ignoreCase = true).length
+        val suffix = rec.ref.drop(prefix).commonSuffixWith(alt.drop(prefix), ignoreCase = true).length
+        if (prefix + suffix != alt.length) return null
+        return (rec.pos + prefix)..(rec.pos + rec.ref.lastIndex - suffix)
+    }
+
+    private fun determineFeatureType(affected: IntRange, tx: TranscriptModel?): String {
+        if (tx == null) return "intron"
+        fun overlaps(feature: GffFeature) =
+            feature.start <= affected.last && feature.end >= affected.first
         return when {
-            tx.cdss.any { rec.pos in it.start..it.end } -> "CDS"
-            tx.exons.any { rec.pos in it.start..it.end } -> "exon"
-            tx.utrs.any  { rec.pos in it.start..it.end } -> "UTR"
+            tx.cdss.any(::overlaps) -> "CDS"
+            tx.utrs.any(::overlaps) -> "UTR"
+            tx.exons.any(::overlaps) -> "exon"
             else -> "intron"
         }
     }
 
-    private fun estimateConsequence(rec: VcfRecord, featureType: String): String {
+    private fun estimateConsequence(
+        rec: VcfRecord,
+        featureType: String,
+        transcript: TranscriptModel?,
+        affected: IntRange,
+        deletion: IntRange?
+    ): String {
+        if (featureType == "intron" && transcript != null && isNearSpliceSite(affected, transcript)) {
+            return "splice_region"
+        }
         if (!rec.isSNP) return when (featureType) {
-            "CDS"   -> "frameshift"
+            "CDS"   -> if (deletion != null && transcript != null) {
+                indelConsequence(deletedCodingBaseCount(deletion, transcript))
+            } else codingConsequence(rec)
             "exon"  -> "exon_indel"
             else    -> "indel"
         }
         return when (featureType) {
-            "CDS"        -> "missense_or_synonymous"   // would need codon context for exact class
+            "CDS"        -> "missense_or_synonymous"
             "exon"       -> "exon_SNP"
             "UTR"        -> "UTR_SNP"
-            "intron"     -> if (isNearSpliceSite(rec)) "splice_region" else "intronic"
+            "intron"     -> "intronic"
             "upstream"   -> "upstream_variant"
             "downstream" -> "downstream_variant"
             else         -> "unknown"
         }
     }
 
-    private fun isNearSpliceSite(rec: VcfRecord): Boolean {
-        // Canonical splice site positions ±2 bp from exon boundary
-        // Without exon coords here we use a proxy: intronic variants close to round numbers
-        return false  // placeholder — full implementation requires exon coords
+    private fun codingConsequence(rec: VcfRecord): String {
+        val consequences = rec.alt.map { allele ->
+            when {
+                !allele.matches(Regex("[ACGTN]+", RegexOption.IGNORE_CASE)) -> "coding_variant"
+                allele.length == rec.ref.length -> "coding_variant"
+                else -> indelConsequence(allele.length - rec.ref.length)
+            }
+        }.distinct()
+        return consequences.singleOrNull() ?: "coding_variant"
+    }
+
+    private fun indelConsequence(lengthChange: Int): String =
+        if (lengthChange % 3 == 0) "inframe_indel" else "frameshift"
+
+    private fun deletedCodingBaseCount(deletion: IntRange, transcript: TranscriptModel): Int {
+        var coveredThrough = deletion.first - 1
+        var count = 0
+        for (cds in transcript.cdss.sortedBy { it.start }) {
+            val start = maxOf(deletion.first, cds.start, coveredThrough + 1)
+            val end = minOf(deletion.last, cds.end)
+            if (start <= end) {
+                count += end - start + 1
+                coveredThrough = end
+            }
+        }
+        return count
+    }
+
+    private fun isNearSpliceSite(affected: IntRange, transcript: TranscriptModel): Boolean {
+        return transcript.exons.sortedBy { it.start }.zipWithNext().any { (left, right) ->
+            val intronStart = left.end.toLong() + 1
+            val intronEnd = right.start.toLong() - 1
+            val first = maxOf(affected.first.toLong(), intronStart)
+            val last = minOf(affected.last.toLong(), intronEnd)
+            first <= last && (first - intronStart < 2 || intronEnd - last < 2)
+        }
     }
 }

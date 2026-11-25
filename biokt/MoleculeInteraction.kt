@@ -15,15 +15,15 @@ internal fun Double.fmt(decimals: Int) = "%.${decimals}f".format(this)
 data class BindingResult(
     val molecule: Molecule,
     val target: String,          // target ID
-    val bindingScore: Double,    // lower = better (like docking score, kcal/mol)
-    val estimatedKd: Double,     // dissociation constant (μM)
+    val bindingScore: Double,    // heuristic score; lower suggests stronger binding
+    val estimatedKd: Double,     // legacy, uncalibrated Kd proxy in μM
     val bindingSite: BindingSite?,
     val interactions: List<MolecularInteraction>,
     val confidence: Double
 ) {
     val isLikelyBinder: Boolean get() = bindingScore < -5.0 && confidence > 0.4
     override fun toString() =
-        "Binding(score=%.2f kcal/mol, Kd=%.2f μM, likely=$isLikelyBinder)".format(bindingScore, estimatedKd)
+        "Binding(score=%.2f, uncalibrated Kd proxy=%.2f μM, likely=$isLikelyBinder)".format(bindingScore, estimatedKd)
 }
 
 data class BindingSite(
@@ -47,6 +47,62 @@ enum class InteractionType {
 // ─── Drug–Protein Binding ────────────────────────────────────
 
 object DrugProteinBinding {
+
+    data class MeasuredAffinity(val ligand: Molecule, val kdMicromolar: Double)
+
+    data class CalibratedBinding(
+        val heuristic: BindingResult,
+        val kdMicromolar: Double,
+        val isExtrapolation: Boolean
+    )
+
+    /** A fit for one protein sequence and one set of comparable assay measurements. */
+    class AffinityCalibration private constructor(
+        internal val targetSequence: String,
+        internal val meanScore: Double,
+        internal val meanLogKd: Double,
+        internal val slope: Double,
+        internal val scoreRange: ClosedFloatingPointRange<Double>
+    ) {
+        companion object {
+            internal fun fit(protein: ProteinSequence, measurements: List<MeasuredAffinity>): AffinityCalibration {
+                require(measurements.size >= 2) { "At least two measured affinities are required" }
+                require(measurements.all { it.kdMicromolar.isFinite() && it.kdMicromolar > 0.0 }) {
+                    "Measured Kd values must be finite and positive"
+                }
+                val scores = measurements.map { score(it.ligand, protein).bindingScore }
+                require(scores.all { it.isFinite() }) { "Calibration requires finite scores" }
+                val logKds = measurements.map { ln(it.kdMicromolar) }
+                val meanScore = scores.average()
+                val meanLogKd = logKds.average()
+                val scoreVariance = scores.sumOf { (it - meanScore).pow(2) }
+                val covariance = scores.indices.sumOf { (scores[it] - meanScore) * (logKds[it] - meanLogKd) }
+                val slope = covariance / scoreVariance
+                require(slope.isFinite() && slope > 0.0) {
+                    "Calibration requires distinct scores with higher scores associated with higher Kd"
+                }
+                return AffinityCalibration(
+                    protein.sequence, meanScore, meanLogKd, slope, scores.min()..scores.max()
+                )
+            }
+        }
+    }
+
+    /** Fit log(Kd in μM) to the heuristic score using measurements from a comparable assay. */
+    fun fitAffinityCalibration(
+        protein: ProteinSequence,
+        measurements: List<MeasuredAffinity>
+    ): AffinityCalibration = AffinityCalibration.fit(protein, measurements)
+
+    /** Apply a target-specific fit and flag scores outside the measured range. */
+    fun score(drug: Molecule, protein: ProteinSequence, calibration: AffinityCalibration): CalibratedBinding {
+        require(protein.sequence == calibration.targetSequence) { "Calibration belongs to a different protein sequence" }
+        val heuristic = score(drug, protein)
+        val bindingScore = heuristic.bindingScore
+        val kd = exp(calibration.meanLogKd + calibration.slope * (bindingScore - calibration.meanScore))
+        require(kd.isFinite() && kd > 0.0) { "Calibrated Kd is outside the representable range" }
+        return CalibratedBinding(heuristic, kd, bindingScore !in calibration.scoreRange)
+    }
 
     // ── Empirical scoring function (ChemScore-like) ──────────
 
@@ -93,7 +149,7 @@ object DrugProteinBinding {
         val rotPenalty = desc.numRotatableBonds * 0.3
         totalScore += rotPenalty
 
-        // Convert score to Kd using linear approximation (ΔG = RT ln Kd)
+        // Retain the historical conversion for callers that read the uncalibrated proxy.
         val rt = 0.001987 * 310.15  // RT at 37°C in kcal/mol
         val kd = exp(totalScore / rt) * 1e6  // μM
 

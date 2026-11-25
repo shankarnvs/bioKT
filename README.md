@@ -6,9 +6,9 @@
 [![JVM](https://img.shields.io/badge/JVM-8%2B-orange?logo=java)](https://openjdk.org)
 [![Tests](https://img.shields.io/badge/Tests-39%2F39%20passing-brightgreen)](#testing)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey)](#-license--disclaimer)
-[![AI Assisted](https://img.shields.io/badge/Built%20with-Claude%20AI-blueviolet?logo=anthropic)](https://claude.ai)
+[![AI-assisted development](https://img.shields.io/badge/AI%20assistance-Claude%20and%20Codex-blueviolet)](#-ai-collaboration)
 
-> 🤖 **This project was developed with the assistance of [Claude](https://claude.ai) (Anthropic's AI assistant).** The library architecture, all source code, documentation, API reference, and this README were generated through an iterative collaboration between a human developer and Claude. See the [AI Collaboration](#-ai-collaboration) section for details.
+> BioKt began with the goal of running sequence analysis, including homology searches, inside Kotlin Android applications. The developer defined the use case and directed development. Claude generated the initial architecture, code, and documentation. Later revisions used OpenAI Codex for corrections, tests, benchmarks, and membrane classifier development. See [AI Collaboration](#-ai-collaboration).
 
 ---
 
@@ -20,7 +20,7 @@ val gene   = DNASequence("ATGGCCATTGTAATGGGCCGCTGA")
 val prot   = gene.translate()                            // MAIVMGR
 val drug   = Molecule("CC(=O)Oc1ccccc1C(=O)O", name="Aspirin")
 val desc   = MolDescriptors.calculate(drug)             // MW, LogP, ADMET…
-val score  = DrugProteinBinding.score(drug, prot)       // –5.46 kcal/mol
+val score  = DrugProteinBinding.score(drug, prot)       // heuristic ranking result
 ```
 
 ---
@@ -64,13 +64,12 @@ val score  = DrugProteinBinding.score(drug, prot)       // –5.46 kcal/mol
 | **Drug-DNA** | Intercalation scoring, minor groove binding, covalent risk profiling |
 | **Drug-Protein** | Empirical binding score, pharmacophore generation & matching, linear QSAR |
 | **CRISPR** | SpCas9 guide efficiency, R-loop propensity, transcription bubble stability |
-| **ML Prediction** | Pretrained classifiers: coding/non-coding DNA, promoter, splice site, enzyme, membrane, drug activity, toxicity (Cramer I/II/III), hERG risk |
+| **ML Prediction** | Built-in rule-based classifiers with literature-derived parameters for sequence, protein, and molecule properties |
 | **Custom Models** | Load any scikit-learn / R / Weka model from JSON weight files — Naive Bayes, kNN, Decision Tree, Random Forest, Logistic Regression |
 | **LLM Integration** | OpenAI GPT-4o, Anthropic Claude, Google Gemini, Ollama (local) — biological interpretation of sequences, proteins, and drug molecules |
 | **Rice Genomics** | `biokt.rice` subpackage — VCF parsing, GFF3 annotation, SSR detection, cis-element scanning, TE classification, R-gene patterns, expression normalisation (TPM/FPKM/DESeq2), DE analysis, haplotype blocks, selection sweeps |
 | **Metal-Ligand** | Metal detection, coordination scoring, metal-binding residue prediction |
 
-**Stats:** 25 source files · 9,108 lines · 86 classes/objects · 253 public functions · 39/39 tests passing
 
 ---
 
@@ -95,7 +94,7 @@ dependencies {
 
 ### Option 3 — Use the source directly (recommended for Android)
 
-Copy all `.kt` files from `src/main/kotlin/biokt/` into your source set. No Maven dependencies needed — only the Kotlin stdlib is required.
+Copy the production Kotlin files from `biokt/` and `biokt/rice/` into your source set. Include the three `*_viewer.html` files as classpath resources if you use report generation.
 
 ---
 
@@ -115,7 +114,7 @@ biokt/
 ├── ProteinDescriptors.kt# ProteinDescriptors (AAC, DPC, CTD, QSO, PAAC, …)
 ├── SequenceInteraction.kt # ProteinInteraction, DNAInteraction, RNAInteraction, DNARNAInteraction
 ├── MoleculeInteraction.kt # DrugProteinBinding, DrugDNABinding, DrugRNABinding, MetalLigandBinding
-├── MLPredictor.kt       # Pretrained ML classifiers (NaiveBayes, kNN, RF, DT, Linear)
+├── MLPredictor.kt       # Built-in classifiers and custom model loading
 ├── GPTClient.kt         # Multi-provider LLM client (OpenAI, Anthropic, Google, Ollama)
 ├── ReportGenerator.kt   # HTML report generation with embedded 3D viewers
 ├── Viewer3D.kt          # Three.js 3D viewers (DNA helix, protein, molecule)
@@ -229,14 +228,30 @@ targets.forEach { println("pos=${it.seedMatchPosition}  type=${it.siteType}") }
 
 ```kotlin
 val result = DrugProteinBinding.score(drug, proteinSeq)
-println(result.bindingScore)    // –5.46 kcal/mol
+println(result.bindingScore)    // lower suggests stronger binding
 println(result.estimatedKd)     // 141.9 µM
 println(result.isLikelyBinder)  // true
 
 result.interactions.forEach { i ->
-    println("[${i.type}] ${i.strength} kcal/mol — ${i.description}")
+    println("[${i.type}] score contribution ${i.strength} — ${i.description}")
 }
 ```
+
+For a Kd estimate in micromolar, fit a calibration with measured affinities
+from a comparable assay on the same protein sequence. Supply separate
+measurements to evaluate the fitted model.
+
+```kotlin
+val calibration = DrugProteinBinding.fitAffinityCalibration(proteinSeq, measuredAffinities)
+val prediction = DrugProteinBinding.score(drug, proteinSeq, calibration)
+println(prediction.kdMicromolar)
+println(prediction.isExtrapolation)
+```
+
+Construct each calibration input as a `DrugProteinBinding.MeasuredAffinity` with
+the molecule and measured Kd in micromolar. Two distinct scores are sufficient
+to fit the curve, while a larger panel is needed to evaluate it. The original
+two-argument method exposes its historical `estimatedKd` as an uncalibrated proxy.
 
 ### Rice genomics (biokt.rice subpackage)
 
@@ -252,6 +267,15 @@ println(vcf.summarise().print())
 val db = AnnotationParser.parseGff3("IRGSP-1.0.gff3")
 val hd1 = db.getByRapId("Os06g0275000")       // Heading date 1
 println(hd1?.summary())
+
+// Resolve coding SNPs with the matching genomic reference FASTA
+val reference = SeqIO.parse("IRGSP-1.0.fa", "fasta")
+    .associate { it.id to it.sequence.sequence }
+val annotations = AnnotationOverlap.annotateVariants(vcf, db, reference)
+for (effect in annotations.flatMap { it.codingSnpEffects }) {
+    println("${effect.consequence}: ${effect.referenceAminoAcid}" +
+        "${effect.aminoAcidPosition ?: "?"}${effect.alternateAminoAcid}")
+}
 
 // SSR detection in a promoter
 val ssrs = myPromoterSeq.detectSSRs()
@@ -284,7 +308,14 @@ FloweringGenes.getBySymbol("Hd1")?.let { println("${it.symbol}: ${it.function}")
 println(RiceChromosomes.position("chr06", 2_886_607))  // short arm (p)
 ```
 
-### ML prediction (pretrained models, no training needed)
+Reference FASTA IDs must match the VCF and GFF3 contig names. Coding SNP
+effects are reported per alternate allele for the primary transcript using
+the standard nuclear genetic code. BioKt uses CDS phase and strand to
+reconstruct the codon. With insufficient reference or phase information, the
+coding SNP retains the generic label. Amino acid positions are 1-based and
+are omitted when the first CDS phase indicates a partial initial codon.
+
+### ML prediction with built-in classifiers
 
 ```kotlin
 // DNA — coding, promoter, splice site
@@ -343,12 +374,17 @@ val claude = GPTConfig.create {
 ## 📁 Project Structure
 
 ```
-biokt/
-├── src/main/kotlin/biokt/    # All 14 source files
-├── biokt2.jar                # Pre-built runnable JAR (includes Kotlin stdlib)
-├── build.gradle.kts          # Gradle build file
-├── settings.gradle.kts
-└── README.md
+bioKT/
+├── README.md
+└── biokt/
+    ├── *.kt                  # Core sources and BioKtTest.kt
+    ├── rice/                 # Rice genomics sources
+    ├── src/test/kotlin/      # Additional JUnit tests
+    ├── *_viewer.html         # Report viewer resources
+    ├── biokt2.jar            # Previously built demo JAR
+    ├── build.gradle.kts
+    ├── settings.gradle.kts
+    └── gradlew, gradlew.bat
 ```
 
 ---
@@ -358,31 +394,26 @@ biokt/
 ### With Gradle (recommended)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/biokt.git
-cd biokt
-./gradlew jar
-java -jar build/libs/biokt-2.0.jar
+git clone https://github.com/shankarnvs/bioKT.git
+cd bioKT/biokt
+sh ./gradlew test installDist
+sh ./build/install/biokt/bin/biokt
 ```
 
-### With kotlinc directly
-
-```bash
-kotlinc src/main/kotlin/biokt/*.kt -include-runtime -d biokt2.jar
-java -jar biokt2.jar
-```
+On Windows, use `gradlew.bat test installDist` and
+`build\install\biokt\bin\biokt.bat`. The installed distribution includes the
+runtime dependencies. The library JAR is `build/libs/biokt-2.0.0.jar`.
 
 ### Requirements
 
-- Kotlin 1.3 or later (Kotlin 1.9+ recommended)
-- Java 8 or later
-
-> **Kotlin version note:** The source uses Kotlin 1.3-compatible idioms (`.map{}.sum()` instead of `.sumOf{}`, etc.) so it builds in older environments. On Kotlin 1.9+, you can modernise these without any functional change.
+- JDK 17
+- The Gradle wrapper pins Gradle 8.10.2. The build uses Kotlin 1.9.22.
 
 ---
 
 ## 📱 Android Integration
 
-Drop all `.kt` files from `src/main/kotlin/biokt/` into your Android project's source set — **no Gradle dependencies beyond the Kotlin stdlib are needed**.
+Copy the production Kotlin files from `biokt/` and `biokt/rice/` into your Android project's source set. Include the viewer resources if you use report generation.
 
 ```kotlin
 // build.gradle.kts (app)
@@ -416,10 +447,20 @@ viewModelScope.launch(Dispatchers.Default) {
 
 ## 🧪 Testing
 
-BioKt ships with 39 self-contained tests. No JUnit or testing framework is required.
+Run the JUnit suite with `sh ./gradlew test` (`gradlew.bat test` on Windows).
+The demo also runs 39 standalone checks and exits with an error if a check fails.
+
+GitHub Actions runs the build, both test suites, and the rice annotation
+correctness benchmark on pushes and pull requests. The workflow publishes the
+JUnit reports and benchmark TSV as artifacts. See the
+[rice benchmark instructions](benchmarks/rice-annotation/README.md) for the
+fixtures and local reproduction commands.
+
+The [JVM performance benchmarks](benchmarks/performance/README.md) measure VCF
+parsing and annotation separately with JMH.
 
 ```bash
-java -jar biokt2.jar
+sh ./gradlew run
 # ...
 # Results: 39 passed, 0 failed out of 39 tests
 ```
@@ -435,7 +476,7 @@ java -jar biokt2.jar
 | Restriction enzymes | 3 |
 | Phylogenetics | 2 |
 | IUPAC codes | 3 |
-| **Total** | **39/39 ✅** |
+| **Total** | **39** |
 
 ---
 
@@ -457,21 +498,21 @@ Open `BioKt_v2_API_Docs.html` directly in any browser — no server needed.
 
 ## 🤖 AI Collaboration
 
-This project was built through an extended, iterative collaboration between a human developer and **[Claude](https://claude.ai)**, Anthropic's AI assistant (Claude Sonnet).
+The developer directed the original implementation with Anthropic Claude and the subsequent audit and evaluation with OpenAI Codex. Reuse of the library in JVM server applications became a second design goal.
 
-### What Claude contributed
+### Original implementation with Claude
 
 - **Library architecture** — module decomposition, class hierarchy, API design decisions
-- **All source code** — all 14 `.kt` files (~4,650 lines), including the SMILES parser, nearest-neighbour thermodynamics, Nussinov RNA folding, Wildman-Crippen LogP, Ertl TPSA, SantaLucia 1998 NN parameters, and empirical ADMET rules
+- **Initial Kotlin implementation** — 14 `.kt` files (~4,650 lines), including the SMILES parser, nearest-neighbour thermodynamics, Nussinov RNA folding, Wildman-Crippen LogP, Ertl TPSA, SantaLucia 1998 NN parameters, and empirical ADMET rules
 - **Debugging** — systematic resolution of ~80 Kotlin 1.3 compatibility errors caused by a broken `sumOf{}` → `map{}.sum()` regex replacement (the most painful session involved tracking brace-depth mismatches across six files simultaneously)
 - **API documentation** — the 65-file Javadoc-style HTML reference with a 3-frame layout, all 140+ method entries, and syntax-highlighted code examples
 - **Tutorial document** — the 18-chapter, 100+ page BioPython-style tutorial with formatted code blocks, output blocks, and callout boxes, generated as `.docx`
 - **Rice genomics subpackage** — `biokt.rice/`: 6 files, 2,970 lines covering VCF parsing, GFF3 annotation, SSR detection, 30 cis-elements, TE classification, R-gene patterns, 18 flowering genes, 6 stress gene sets, DESeq2 normalisation, Welch DE analysis, Gabriel haplotype blocks, windowed Tajima's D, and cross-population selection sweep scoring
-- **ML inference engine** — `MLPredictor.kt`: 8 pretrained classifiers across 3 domains, 4 algorithm families, custom model JSON loader, ensemble voting
+- **ML inference engine** — `MLPredictor.kt`: built-in classifiers with literature-derived parameters, custom model JSON loader, and ensemble voting
 - **LLM integration layer** — `GPTClient.kt`: multi-provider HTTP client (OpenAI, Anthropic, Google, Ollama), structured biological prompt builders, extension functions
-- **This README**
+- **Initial README**
 
-### How the collaboration worked
+### How the original collaboration worked
 
 The session proceeded roughly as:
 
@@ -483,6 +524,10 @@ The session proceeded roughly as:
 6. Human requested Javadoc-style API docs → Claude generated 65 HTML files
 7. Human requested a BioPython-style tutorial → Claude wrote the 18-chapter document
 8. Human requested this README
+
+### Audit and evaluation with OpenAI Codex
+
+The developer selected the workflows and requested comparisons against reference implementations and measured data. Codex assisted with build reproducibility, variant annotation and duplex corrections, regression tests, benchmark implementation and execution, and the pooled vertebrate membrane classifier. The [machine-learning benchmark](benchmarks/ml/README.md) documents the model inputs, training procedure and evaluation split.
 
 ### Disclaimer
 
@@ -567,7 +612,7 @@ SOFTWARE.
 
 ### ⚠️ Scientific Accuracy Disclaimer
 
-This library was created as a **demonstration of what AI (Claude by Anthropic) can build**. It is a learning resource and a proof of concept — not a validated scientific tool for production or clinical use.
+The original release documented an experiment in AI-assisted Kotlin development. Subsequent evaluations cover specific datasets and workflows. The [benchmark scripts](benchmarks/) and [pooled membrane classifier revision](https://github.com/shankarnvs/bioKT/commit/d8111097e9a57256ac0b1d392090cc22c3a89ab4) identify the scope of that evidence.
 
 **Use at your own discretion. The author is not responsible for the accuracy or inaccuracy of any result produced by this library.**
 
@@ -588,7 +633,7 @@ Specific limitations to be aware of:
 
 <div align="center">
 
-**BioKt v2.0** · Built with ❤️ and [Claude AI](https://claude.ai)
+**BioKt** · Developer-directed work with Claude and OpenAI Codex.
 
 *Kotlin bioinformatics for the JVM — from sequences to drug discovery*
 

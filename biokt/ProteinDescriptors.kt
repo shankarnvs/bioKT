@@ -350,11 +350,11 @@ object ProteinDescriptors {
     }
 
     // GRAVY (Grand Average of Hydropathicity — Kyte & Doolittle)
-    fun gravyIndex(seq: ProteinSequence): Double {
-        val kd = mapOf('A' to 1.8,'R' to -4.5,'N' to -3.5,'D' to -3.5,'C' to 2.5,'Q' to -3.5,
+    internal val kyteDoolittle = mapOf('A' to 1.8,'R' to -4.5,'N' to -3.5,'D' to -3.5,'C' to 2.5,'Q' to -3.5,
             'E' to -3.5,'G' to -0.4,'H' to -3.2,'I' to 4.5,'L' to 3.8,'K' to -3.9,'M' to 1.9,
             'F' to 2.8,'P' to -1.6,'S' to -0.8,'T' to -0.7,'V' to 4.2,'W' to -0.9,'Y' to -1.3)
-        return seq.sequence.mapNotNull { kd[it] }.average()
+    fun gravyIndex(seq: ProteinSequence): Double {
+        return seq.sequence.mapNotNull { kyteDoolittle[it] }.average()
     }
 
     // Aliphatic index (Ikai 1980)

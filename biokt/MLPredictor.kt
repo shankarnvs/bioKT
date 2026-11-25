@@ -666,6 +666,97 @@ object FeatureExtractor {
         (seq.instabilityIndex() / 100.0).coerceIn(0.0, 1.0)
     )
 
+    /** Zero-based inclusive intervals maximizing total excess hydropathy minus
+     * a segment-opening penalty. A candidate must contain at least 12 residues.
+     * Traceback chooses non-overlapping intervals in linear time.
+     */
+    private fun variableRegions(seq: ProteinSequence): List<IntRange> {
+        val s = seq.sequence
+        val minimum = 12
+        val prefix = DoubleArray(s.length + 1)
+        val best = DoubleArray(prefix.size)
+        val startAt = IntArray(prefix.size) { -1 }
+        var start = 0
+        for (end in 1..s.length) {
+            val hydropathy = ProteinDescriptors.kyteDoolittle[s[end - 1]] ?: -4.5
+            prefix[end] = prefix[end - 1] + hydropathy - 0.8
+            best[end] = best[end - 1]
+            val latest = end - minimum
+            if (latest < 0) continue
+            if (best[latest] - prefix[latest] > best[start] - prefix[start]) start = latest
+            val score = best[start] + prefix[end] - prefix[start] - 15.2
+            if (score > best[end] + 1e-10) {
+                best[end] = score
+                startAt[end] = start
+            }
+        }
+        val regions = mutableListOf<IntRange>()
+        var end = s.length
+        while (end > 0) {
+            val begin = startAt[end]
+            if (begin < 0) end-- else {
+                regions.add(begin until end)
+                end = begin
+            }
+        }
+        return regions.asReversed()
+    }
+
+    private data class Proposal(val span: IntRange, val sources: Int, val peak: Double)
+
+    private fun combinedRegions(seq: ProteinSequence): List<Proposal> {
+        val prefix = DoubleArray(seq.length + 1)
+        for ((i, aa) in seq.sequence.withIndex()) {
+            prefix[i + 1] = prefix[i] + (ProteinDescriptors.kyteDoolittle[aa] ?: -4.5)
+        }
+        fun mean(r: IntRange) = (prefix[r.last + 1] - prefix[r.first]) / (r.last - r.first + 1)
+        val proposals = variableRegions(seq).map { Proposal(it, 1, mean(it)) }.toMutableList()
+        for ((index, width) in listOf(13, 19, 25).withIndex()) {
+            for (start in 0..seq.length - width) {
+                val span = start until start + width
+                val score = mean(span)
+                if (score >= 1.6 - 1e-10) proposals.add(Proposal(span, 2 shl index, score))
+            }
+        }
+        val merged = mutableListOf<Proposal>()
+        for (p in proposals.sortedBy { it.span.first }) {
+            val last = merged.lastOrNull()
+            if (last == null || p.span.first > last.span.last) merged.add(p)
+            else merged[merged.lastIndex] = Proposal(last.span.first..maxOf(last.span.last, p.span.last),
+                last.sources or p.sources, maxOf(last.peak, p.peak))
+        }
+        return merged
+    }
+
+    /** Zero-based inclusive regions proposed by segmentation or hydropathy windows. */
+    fun membraneCandidateRegions(seq: ProteinSequence) = combinedRegions(seq).map { it.span }
+
+    /** Features of inferred regions: strongest mean hydropathy, count, coverage,
+     * charge densities inside and adjacent to the strongest region, relative start,
+     * and presence of a subsequent region. Also includes strongest-region width, peak proposal hydropathy and source count.
+     */
+    fun localMembraneFeatures(seq: ProteinSequence): DoubleArray {
+        val s = seq.sequence
+        val proposals = combinedRegions(seq)
+        if (proposals.isEmpty()) return DoubleArray(10)
+        val regions = proposals.map { it.span }
+        fun mean(region: IntRange) = region.sumOf {
+            ProteinDescriptors.kyteDoolittle[s[it]] ?: -4.5
+        } / (region.last - region.first + 1)
+        val strongest = proposals.maxWith(compareBy<Proposal> { it.peak }.thenBy { Integer.bitCount(it.sources) }.thenBy { mean(it.span) })
+        val peak = strongest.span
+        val end = peak.last + 1
+        val flank = s.substring(maxOf(0, peak.first - 5), peak.first) +
+            s.substring(end, minOf(s.length, end + 5))
+        fun charge(region: String) =
+            region.count { it in "RKHDE" }.toDouble() / region.length.coerceAtLeast(1)
+        return doubleArrayOf(mean(peak), regions.size.toDouble(),
+            regions.sumOf { it.last - it.first + 1 }.toDouble() / s.length,
+            charge(s.substring(peak)), charge(flank), peak.first.toDouble() / s.length,
+            if (regions.last() != peak) 1.0 else 0.0,
+            (end - peak.first).toDouble(), strongest.peak, Integer.bitCount(strongest.sources).toDouble())
+    }
+
     fun membraneFeatures(seq: ProteinSequence): DoubleArray {
         val charged = listOf('R','K','H','D','E').map { seq.count(it) }.sum().toDouble() / seq.length
         return doubleArrayOf(
@@ -751,6 +842,21 @@ object SequenceMLPredictor {
 }
 
 object ProteinMLPredictor {
+    private val expandedMembraneModel by lazy {
+        val resource = checkNotNull(ProteinMLPredictor::class.java.getResourceAsStream("/membrane-model.tsv"))
+        val parameters = resource.bufferedReader().useLines { lines ->
+            lines.map { line ->
+                val (name, value) = line.split('\t')
+                name to value.toDouble()
+            }.toMap()
+        }
+        val names = parameters.keys.filter { it != "intercept" }
+        val weights = names.map { parameters.getValue(it) }.toDoubleArray()
+        val model = LinearClassifier("BioKt expanded membrane predictor",
+            mapOf("soluble" to DoubleArray(names.size), "membrane" to weights),
+            mapOf("soluble" to 0.0, "membrane" to parameters.getValue("intercept")), names)
+        names to model
+    }
 
     /** Is this protein likely to be an enzyme? */
     fun predictEnzyme(seq: ProteinSequence): MLPrediction =
@@ -758,9 +864,16 @@ object ProteinMLPredictor {
             .predict(FeatureExtractor.proteinFeatures(seq))
 
     /** Is this protein membrane-associated or soluble? */
-    fun predictMembrane(seq: ProteinSequence): MLPrediction =
-        PretrainedModels.membraneClassifier
-            .predict(FeatureExtractor.membraneFeatures(seq))
+    fun predictMembrane(seq: ProteinSequence): MLPrediction {
+        // ProtParam requires standard residues. Preserve legacy behavior on other inputs.
+        if (seq.sequence.isEmpty() || seq.sequence.any { it !in ProteinAnalysisData.letters }) {
+            return PretrainedModels.membraneClassifier.predict(FeatureExtractor.membraneFeatures(seq))
+        }
+        val features = MembraneInputs.extract(seq)
+        val (names, model) = expandedMembraneModel
+        check(names.size == features.size)
+        return model.predict(names.map { features.getValue(it) }.toDoubleArray())
+    }
 
     /** Run both classifiers */
     fun fullAnalysis(seq: ProteinSequence): Map<String, MLPrediction> = mapOf(
